@@ -1,0 +1,52 @@
+TASK: Finance Manager 500 Error Diagnostic
+Created: 2026-04-30T16:04:32+01:00
+Result target: results/2026-04-30-fm-diagnose-001.md
+
+CONTEXT:
+Finance Manager PHP app on Apache server returns blank HTTP 500.
+- TiDB Cloud database in use
+- PHP syntax check (php -l) returned no errors on all files
+- Apache logs show only standard service started logs (no 500 detail)
+- Error reporting lines were added but 500 still shows no detail
+
+STEPS TO RUN (in order):
+
+1. Create /var/www/html/test.php with content:
+   <?php echo 'PHP OK';
+   Then curl or wget it: curl -s http://localhost/test.php
+   Record output.
+
+2. Create /var/www/html/probe.php with content:
+   <?php
+   ini_set('display_errors', 1);
+   ini_set('log_errors', 1);
+   ini_set('error_log', '/tmp/fm-php.log');
+   error_reporting(E_ALL);
+   require __DIR__ . '/db.php';
+   echo 'DB FILE LOADED';
+   Then: curl -s http://localhost/probe.php
+   Then: cat /tmp/fm-php.log
+   Record all output.
+
+3. Run:
+   php -m | grep -Ei 'pdo|mysql|mysqli|openssl|tidb|mysqlnd'
+   php -i | grep -Ei 'Loaded Configuration File|error_log|display_errors'
+   Record output.
+
+4. Show the contents of db.php (cat /var/www/html/db.php)
+
+5. Attempt to curl the main finance manager page:
+   curl -v http://localhost/finance_manager.php 2>&1 | tail -30
+
+RESULT FORMAT (write to results/2026-04-30-fm-diagnose-001.md):
+- Task: 2026-04-30-fm-diagnose-001.txt
+- Status: success/failed
+- Time: <ISO timestamp>
+- Summary: <one paragraph diagnosis>
+- Step 1 output: <test.php result>
+- Step 2 output: <probe.php result + fm-php.log content>
+- Step 3 output: <php -m and php -i results>
+- Step 4 output: <db.php contents>
+- Step 5 output: <curl -v output>
+- Root cause: <best determination>
+- Suggested fix: <specific action>
