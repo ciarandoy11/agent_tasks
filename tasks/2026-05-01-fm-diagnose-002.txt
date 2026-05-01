@@ -1,0 +1,93 @@
+TASK TYPE: BASH EXECUTION ON A LINUX SERVER
+THIS IS NOT AN N8N WORKFLOW TASK. DO NOT IMPORT, DEPLOY, OR TOUCH n8n IN ANY WAY.
+DO NOT call any n8n API. DO NOT read or write any n8n workflow files.
+YOUR ONLY JOB: Run the shell commands below on the server and write the output to a results file.
+
+---
+
+CONTEXT:
+A PHP web app called Finance Manager is returning a blank HTTP 500. PHP syntax checks passed.
+Root cause is unknown. Run the following diagnostic shell commands and capture every output exactly.
+
+---
+
+STEP 1 — PHP handler test
+Run:
+  echo '<?php echo "PHP OK"; ?>' > /var/www/html/test_php.php
+  curl -s -o /tmp/step1_body.txt -w "%{http_code}" http://localhost/test_php.php > /tmp/step1_status.txt
+  cat /tmp/step1_body.txt
+  cat /tmp/step1_status.txt
+
+Record: exact body output and HTTP status code.
+
+STEP 2 — db.php isolation probe
+Run:
+  cat > /var/www/html/db_test.php << 'EOF'
+<?php
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+require_once 'db.php';
+echo "DB OK";
+?>
+EOF
+  curl -s -o /tmp/step2_body.txt -w "%{http_code}" http://localhost/db_test.php > /tmp/step2_status.txt
+  cat /tmp/step2_body.txt
+  cat /tmp/step2_status.txt
+
+Record: exact body output, HTTP status code, and any PHP errors shown.
+
+STEP 3 — PHP extensions
+Run:
+  php -m | sort
+
+Record: full sorted list.
+
+STEP 4 — Apache error log
+Run:
+  tail -n 50 /var/log/apache2/error.log 2>/dev/null || tail -n 50 /var/log/httpd/error_log 2>/dev/null || echo "NO LOG FOUND"
+
+Record: last 50 lines or "NO LOG FOUND".
+
+STEP 5 — Finance Manager direct curl
+Run:
+  curl -v http://localhost/index.php 2>&1 | head -n 80
+
+Record: full verbose output including response headers and body.
+
+STEP 6 — List Finance Manager files
+Run:
+  ls -la /var/www/html/
+
+Record: full file listing.
+
+---
+
+OUTPUT INSTRUCTIONS:
+Write ALL results to: results/2026-05-01-fm-diagnose-002.md
+
+Use this exact format:
+
+Task: 2026-05-01-fm-diagnose-002.txt
+Status: success | partial | failed
+Time: <ISO 8601 timestamp>
+Summary: <one paragraph — what is the likely root cause of the HTTP 500 based on the outputs above>
+
+## Step 1 — PHP handler
+<exact output>
+
+## Step 2 — db.php probe
+<exact output>
+
+## Step 3 — PHP extensions
+<exact output>
+
+## Step 4 — Apache error log
+<exact output>
+
+## Step 5 — Finance Manager curl
+<exact output>
+
+## Step 6 — File listing
+<exact output>
+
+DO NOT summarise or truncate any step output. Write it all.
