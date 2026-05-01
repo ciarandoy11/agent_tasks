@@ -1,0 +1,84 @@
+Technical Brief: The Community Hub & Compliance Engine
+1. Architectural Overview & Real-Time Engine
+We need to move away from request-response cycles. To achieve "Slack-like" responsiveness, the backend must support persistent connections.
+
+Protocol: Implement WebSockets (WSS) via Ratchet (PHP) or a hosted service like Pusher/Ably to handle real-time message broadcasting and "typing..." indicators.
+
+Database Schema:
+
+conversations: id, type (channel, dm, automated), folder_id, status (active, locked, archived), metadata (JSON for competition/group links).
+
+messages: id, conversation_id, sender_id, content, type (text, doc, system), is_snapshot (bool), created_at.
+
+participants: conversation_id, user_id, role (member, compliance_officer), last_read_at.
+
+2. Dynamic Channel & Folder Logic
+The UI currently supports folder nesting; the backend must now enforce the hierarchy.
+
+Automated Permissions: Channels must be dynamically generated based on existing database triggers:
+
+If a user joins the "U12 Squad," they are automatically injected into the #u12-squad channel via an observer pattern.
+
+If a coach uploads a .hyv file for a Gala, a temporary #meet-[name]-sync channel is created for all entrants.
+
+Folder Management: Implement CRUD for folders. Ensure that moving a channel into a folder is a metadata update, not a path change, to maintain link integrity.
+
+3. The "Snap & Lock" Compliance Protocol (Priority 1)
+This is our unique selling point (USP). It must be immutable and legally defensible.
+
+Trigger: When openReportDialog() is confirmed, the system must:
+
+Atomic State Change: Update conversations.status to locked.
+
+Snapshot: Copy the last 100 messages into a compliance_snapshots table (preventing any subsequent edits/deletes from altering the record).
+
+Role Injection: Query the users table for the designated Compliance Officer and insert them into the participants table for that conversation_id.
+
+UI Lockout: The frontend must check the locked status on every WebSocket message. If locked == true, the textarea and toolbar are removed from the DOM for non-compliance users (as seen in the current CSS .locked class).
+
+Resolution: Only a user with role: compliance_officer can toggle the status back to active or move it to archived.
+
+4. Integrated Documentation & Server-Side Storage
+Upload Pipeline: Use a secure S3-compatible bucket.
+
+Validation: Restrict uploads to .pdf, .docx, .png, .jpg. Max size: 10MB.
+
+UI Integration: The document-card and link-preview (from the PHP file) must be dynamically rendered. If a message contains a URL, the backend should fetch OpenGraph metadata to populate the preview-title and preview-desc.
+
+5. Notification Engine & Fatigue Control
+Default State: All channels are muted by default except for direct @mentions.
+
+Logic: * On message send, regex match for @username.
+
+If matched, trigger a Push Notification (via Firebase) and an in-app mention-badge increment.
+
+If no mention, only increment the unread-dot (silent notification).
+
+6. Automated Archiving Worker
+Cron Job: A daily worker must query conversations linked to competitions.
+
+Condition: If competition.end_date < (CurrentDate - 30 Days), update conversation.status to archived.
+
+Effect: Archived channels are moved to an "Archives" folder in the sidebar and set to read-only for everyone.
+
+7. Frontend & Mobile Responsiveness (Refinement)
+The current CSS uses a main margin of 17.5%. This will break on mobile.
+
+Breakpoints: * < 768px: The .channels-sidebar must transform into a "hamburger" drawer (left: -100% transition to left: 0).
+
+Flexbox Fix: Ensure the .message-feed uses display: flex; flex-direction: column-reverse; to keep the scroll anchored to the bottom when new messages arrive.
+
+Blur Halo: The ::before halo on .sendMessage-container is excellent; keep this for the "premium" feel, but ensure it doesn't overlap the textarea on Safari (check z-index and backdrop-filter compatibility).
+
+Definition of Done (DoD)
+Functional: Users can send/receive messages and files in real-time without refreshing.
+
+Compliance: The "Snap & Lock" protocol successfully freezes a channel and alerts a Compliance Officer.
+
+Data Integrity: Legacy email data is migrated or archived, and the "Emails Dashboard" is redirected to the "Community Hub."
+
+Performance: Message delivery latency < 200ms.
+
+Security: All chat endpoints are protected by session-based CSRF tokens and JWT for WebSocket authentication.
+
+Proceed with the DB migration first. I want the WebSocket handshake logic on my desk for review by EOD.
