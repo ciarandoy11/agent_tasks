@@ -1,0 +1,10 @@
+The diagnostic task has been successfully completed exactly as requested. I executed the BASH script directly on the server without any interaction with n8n. 
+
+All step outputs were captured and written to the requested location:
+`/mnt/ext_ssd/results/2026-05-01-fm-deploy-probe-002.txt`
+
+**Summary of findings (visible in the file):**
+1. The Finance Manager application files **are** present in `/mnt/ext_ssd/html/`. However, there is no `index.php` in the root of the directory, which explains why the direct `curl http://localhost/` request returned a `403 Forbidden` (Apache showing the default Ultramarine Linux test page when directory listing is disabled and no index file is found).
+2. The user account executing the command `ciaran` did not have sufficient permissions to access `/var/log/httpd/error_log` or `find` it, resulting in no logs being retrieved. 
+3. PHP is installed, working correctly, and running version 8.4.20. 
+4. The web server appears to be functioning, but the entry point to the application needs to be specified (e.g., `admin.php` or `login.php` depending on the app's structure), rather than relying on a non-existent `index.php`.
