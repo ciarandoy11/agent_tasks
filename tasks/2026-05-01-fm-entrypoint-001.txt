@@ -1,0 +1,28 @@
+BASH EXECUTION ON A LINUX SERVER — DO NOT TOUCH n8n. DO NOT import workflows. DO NOT interact with n8n in any way.
+
+Your ONLY job is to run the following shell commands and write the exact output to:
+  /mnt/ext_ssd/results/2026-05-01-fm-entrypoint-001.txt
+
+--- COMMANDS ---
+
+STEP 1: List all files in the Finance Manager docroot (recursive, show full paths)
+  find /mnt/ext_ssd/html -type f | sort
+
+STEP 2: List top-level directory structure
+  ls -la /mnt/ext_ssd/html/
+
+STEP 3: Try to read Apache error log via alternate paths
+  sudo cat /var/log/httpd/error_log 2>&1 | tail -30
+  cat /mnt/ext_ssd/logs/error_log 2>&1 | tail -30
+  find /mnt/ext_ssd -name "error_log" 2>/dev/null
+  find /var/log -name "*.log" 2>/dev/null
+
+STEP 4: curl the actual entry point candidates
+  curl -s -o /dev/null -w "%{http_code}" http://localhost/admin.php
+  curl -s -o /dev/null -w "%{http_code}" http://localhost/login.php
+  curl -s -o /dev/null -w "%{http_code}" http://localhost/index.html
+
+--- END OF COMMANDS ---
+
+Write ALL output (including errors) to /mnt/ext_ssd/results/2026-05-01-fm-entrypoint-001.txt
+Then write the same output to the agent_tasks repo at results/2026-05-01-fm-entrypoint-001.txt
