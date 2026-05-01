@@ -1,0 +1,39 @@
+Finance Manager diagnostic - rerun via fixed dual-trigger workflow.
+
+The Finance Manager is returning a blank HTTP 500. PHP syntax checks passed (all files clean). Root cause is unknown. Run the following diagnostic sequence and write results back to results/2026-05-01-fm-diagnose-001.md:
+
+1. PHP Apache handler test
+   Create /var/www/html/test_php.php containing: <?php echo "PHP OK"; ?>
+   curl http://localhost/test_php.php
+   Report exact output and HTTP status.
+
+2. db.php isolation probe
+   Create /var/www/html/db_test.php containing:
+     <?php
+     error_reporting(E_ALL);
+     ini_set('display_errors', 1);
+     require_once 'db.php';
+     echo "DB OK";
+   ?>
+   curl http://localhost/db_test.php
+   Report exact output, HTTP status, and any errors.
+
+3. PHP extension check
+   php -m | sort
+   Report full list.
+
+4. Apache error log tail
+   tail -n 50 /var/log/apache2/error.log (or equivalent)
+   Report last 50 lines.
+
+5. Finance Manager direct curl
+   curl -v http://localhost/finance_manager.php 2>&1
+   Report full verbose output including headers.
+
+Write results to: results/2026-05-01-fm-diagnose-001.md
+Format:
+  Task: 2026-05-01-fm-diagnose-001.txt
+  Status: success/failed
+  Time: <ISO timestamp>
+  Summary: <one paragraph root cause assessment>
+  Step outputs: <each step labelled and full output>
