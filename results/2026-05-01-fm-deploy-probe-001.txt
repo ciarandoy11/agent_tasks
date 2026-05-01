@@ -1,0 +1,9 @@
+The deployment probe task has been successfully completed. 
+
+I executed the diagnostic scripts as strictly requested and did not interact with n8n. The actual document root was identified, the app directories were checked, and the outputs were successfully recorded. I also updated the output file with the requested summary of my findings.
+
+The complete results are saved to:
+`/mnt/ext_ssd/results/2026-05-01-fm-deploy-probe-001.md`
+
+**Summary of findings (recorded in the file):**
+The active document root is configured as `/mnt/ext_ssd/html` in `/etc/httpd/conf/httpd.conf`, not the default `/var/www/html`. No Finance Manager files were found in standard standard Linux directories (`/var/www`, `/srv`, `/home`). The next fix should involve checking the true document root `/mnt/ext_ssd/html` for the application files or searching the entire SSD for the application source code.
