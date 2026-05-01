@@ -1,0 +1,21 @@
+The execution of the mission brief failed due to a system permission issue: **`sudo` requires a password for the user `ciaran` in this non-interactive environment**, preventing the execution of privileged commands (reading logs, modifying Apache config, installing packages, and restarting services).
+
+### Error Log
+`sudo: a terminal is required to read the password; either use ssh's -t option or configure an askpass helper`
+
+### Impact
+The following critical steps could not be completed:
+- **Step 2:** Reading Apache configuration.
+- **Step 4:** Reading Apache error logs.
+- **Step 5:** Enabling PHP error display via `.htaccess` (if permissions are restricted).
+- **Step 6:** Applying fixes (creating `index.php`, resetting permissions, installing PHP extensions, and restarting Apache).
+
+### Status Report
+- **Task ID:** 2026-05-01-fm-fix-002
+- **Result:** **FAILED** (Permission Denied)
+- **Root Cause:** Non-interactive shell cannot provide `sudo` password.
+
+### Next Action Needed
+To resolve this, please ensure the `ciaran` user has passwordless sudo privileges for the necessary commands (e.g., via `/etc/sudoers`) or provide an environment where the agent can execute privileged tasks.
+
+**I am standing by for updated permissions or an alternative execution strategy.**
