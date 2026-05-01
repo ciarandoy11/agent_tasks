@@ -1,0 +1,28 @@
+Team, we’ve laid a solid foundation with the Phase 1 and 2 documentation on the persistent drive. Now, it is time to move from blueprints to a live, battle-hardened **Community Hub & Compliance Engine**.
+
+Our goal is to deprecate the legacy "Emails Dashboard" entirely and replace it with this modern, real-time ecosystem. This isn't just about chat; it’s about a defensible safety architecture for sports.
+
+### 1. Full-Stack WebSocket & UI Integration
+* **Real-Time Bridge:** Implement the WebSocket logic to connect our PHP backend to the existing `messagingDashboard.php` frontend.
+* **State-Aware UI:** Use the existing CSS `.locked` and `.lockout-banner` states to dynamically disable the `message-box` and `shortcut-hint` when a channel status changes.
+* **Feed Management:** Ensure the `.message-feed` handles incoming message payloads without page refreshes, maintaining the current "blurred halo" aesthetics.
+
+### 2. Safeguarding: The "Snap & Lock" Protocol
+* **Atomic Transition:** When `triggerComplianceLock()` is called, the backend must atomically update the conversation status, snapshot the message history, and inject the Compliance Officer into the participants list.
+* **Visual Validation:** Ensure the `#complianceOfficerBadge` is toggled for all participants in real-time via the socket stream.
+
+### 3. Dynamic Logic & Automation
+* **Automated Channels:** Write the triggers to auto-generate channels based on Athlete Sub-groups or Competition entries, moving away from manual setup.
+* **Folder Persistence:** Connect `openAddDialog()` to the backend CRUD logic so that users can organize channels into `Folders` that persist across sessions.
+* **Mention Logic:** Implement the "Mentions Only" notification rule (@username) to prevent user fatigue, only triggering `mention-badge` increments for specific targets.
+* **Archiving Worker:** Set up the 30-day post-event automated archiving cron job for competition-specific channels.
+
+### 4. Integrated Documentation
+* **Secure Delivery:** Enable file uploads that render as `document-card` components within the chat, ensuring they are hosted securely on our server.
+* **Link Previews:** Implement the backend parser to generate `link-preview` cards for internal MySportManager timetable links.
+
+---
+
+**Complete all technical implementation and architectural hardening first.** Once the engine is fully operational and verified, return to me with a detailed list of **Manual Actions** (e.g., Stripe Connect configuration, specific server permissions, or manual database flag resets) that require my intervention to go live.
+
+How do you plan to handle the client-side state transition if a user is mid-sentence when a "Snap & Lock" broadcast is received from the server?
