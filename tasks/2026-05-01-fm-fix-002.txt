@@ -1,0 +1,184 @@
+═══════════════════════════════════════════════════════════════
+TASK TYPE: BASH EXECUTION ON LINUX SERVER (Raspberry Pi)
+DO NOT touch n8n. DO NOT deploy n8n workflows. DO NOT call any
+external APIs unless explicitly instructed below.
+ONLY run bash commands on the local server.
+═══════════════════════════════════════════════════════════════
+
+TASK ID: 2026-05-01-fm-fix-002
+OBJECTIVE: Find the Finance Manager entry point and fix the HTTP error so the app loads.
+
+OUTPUT FILE — ABSOLUTE PATH, NO EXCEPTIONS:
+  /mnt/ext_ssd/results/2026-05-01-fm-fix-002.txt
+
+DO NOT use a relative path. DO NOT write to ./results/ or ~/results/.
+Write ONLY to: /mnt/ext_ssd/results/2026-05-01-fm-fix-002.txt
+
+═══════════════════════════════════════════════════════════════
+CONTEXT (READ BEFORE STARTING):
+- Application: Finance Manager (PHP/Apache on Linux — Raspberry Pi)
+- Document root confirmed: /mnt/ext_ssd/html/
+- PHP 8.4.20 confirmed working
+- Apache running
+- No index.php found at /mnt/ext_ssd/html/ root → server returns 403
+- Previous fix task (fm-fix-001) likely ran but results file did not land in repo
+  → Read /mnt/ext_ssd/results/2026-05-01-fm-fix-001.txt first (Step 0)
+- Database: TiDB Cloud, MySQL-compatible, port 4000 (remote/cloud)
+═══════════════════════════════════════════════════════════════
+
+RUN EVERY STEP IN ORDER. DO NOT SKIP. Record ALL output.
+
+──────────────────────────────────────────────────────────────
+STEP 0: READ PREVIOUS RESULTS (if they exist)
+──────────────────────────────────────────────────────────────
+
+  cat /mnt/ext_ssd/results/2026-05-01-fm-fix-001.txt 2>/dev/null || echo "FILE NOT FOUND: fm-fix-001 results missing"
+  cat /mnt/ext_ssd/results/2026-05-01-fm-entrypoint-001.txt 2>/dev/null || echo "FILE NOT FOUND: fm-entrypoint-001 results missing"
+
+If fix-001 results exist and show the app is already fixed (HTTP 200), skip to Step 7 and report success.
+
+──────────────────────────────────────────────────────────────
+STEP 1: MAP ALL FILES IN DOCROOT
+──────────────────────────────────────────────────────────────
+
+  ls -la /mnt/ext_ssd/html/
+  find /mnt/ext_ssd/html/ -maxdepth 4 -type f | sort
+  find /mnt/ext_ssd/html/ -name "*.php" | sort
+
+Record every file found. This is the complete list of what's deployed.
+
+──────────────────────────────────────────────────────────────
+STEP 2: READ APACHE CONFIG
+──────────────────────────────────────────────────────────────
+
+  sudo cat /etc/apache2/sites-enabled/* 2>/dev/null || sudo cat /etc/httpd/conf.d/*.conf 2>/dev/null
+  sudo apache2ctl -S 2>/dev/null || sudo httpd -S 2>/dev/null
+  sudo cat /etc/apache2/apache2.conf 2>/dev/null | grep -E "DocumentRoot|DirectoryIndex|AllowOverride"
+
+──────────────────────────────────────────────────────────────
+STEP 3: TEST CURRENT HTTP STATUS
+──────────────────────────────────────────────────────────────
+
+  curl -sI http://localhost/ 2>/dev/null
+  curl -sI http://localhost/login.php 2>/dev/null
+  curl -sI http://localhost/admin.php 2>/dev/null
+  curl -sI http://localhost/index.html 2>/dev/null
+
+Record status codes for each.
+
+──────────────────────────────────────────────────────────────
+STEP 4: READ APACHE ERROR LOG
+──────────────────────────────────────────────────────────────
+
+  sudo tail -80 /var/log/apache2/error.log 2>/dev/null
+  sudo tail -80 /var/log/httpd/error_log 2>/dev/null
+  sudo journalctl -u apache2 -n 80 --no-pager 2>/dev/null
+  sudo journalctl -u httpd -n 80 --no-pager 2>/dev/null
+
+Record whichever produces output.
+
+──────────────────────────────────────────────────────────────
+STEP 5: ENABLE PHP ERROR DISPLAY, RE-TEST
+──────────────────────────────────────────────────────────────
+
+Find a PHP file that returns a non-200/403 response (from Step 3), then run:
+
+  # Temporarily enable display_errors to surface the real PHP error
+  sudo tee /mnt/ext_ssd/html/.htaccess > /dev/null << 'HTEOF'
+php_flag display_errors On
+php_value error_reporting 32767
+HTEOF
+
+  curl -s http://localhost/login.php 2>/dev/null | head -100
+  curl -s http://localhost/admin.php 2>/dev/null | head -100
+  curl -s http://localhost/index.php 2>/dev/null | head -100
+
+Record the FULL output including any PHP error messages — this reveals the root cause.
+
+  # Remove .htaccess after capture
+  sudo rm /mnt/ext_ssd/html/.htaccess 2>/dev/null
+
+──────────────────────────────────────────────────────────────
+STEP 6: APPLY FIX
+──────────────────────────────────────────────────────────────
+
+Based on what Steps 1–5 found, apply the appropriate fix:
+
+FIX A — If no index.php and app entry point is a different file (e.g. login.php, admin.php, app.php):
+  Option A1: Create a redirect index.php at the docroot:
+    sudo tee /mnt/ext_ssd/html/index.php > /dev/null << 'PHPEOF'
+<?php header('Location: /login.php'); exit();
+PHPEOF
+    sudo chown www-data:www-data /mnt/ext_ssd/html/index.php
+    sudo chmod 644 /mnt/ext_ssd/html/index.php
+
+  Option A2: Or update Apache DirectoryIndex in the vhost config:
+    Find the vhost config file (from Step 2), add/update:
+    DirectoryIndex login.php admin.php index.php index.html
+    sudo systemctl restart apache2 2>/dev/null || sudo systemctl restart httpd 2>/dev/null
+
+FIX B — If a PHP file returns 500 and error output shows a DB connection error:
+  - Read the config/DB file: cat /mnt/ext_ssd/html/config.php 2>/dev/null
+  - Check TiDB connectivity: nc -zv <tidb-host> 4000 2>&1
+  - Do NOT change credentials. Record what the config shows (redact passwords).
+
+FIX C — If a PHP file returns 500 and error output shows missing extension:
+  sudo apt-get install -y php-mysql php-pdo php-mbstring php-curl 2>&1
+  sudo systemctl restart apache2 2>/dev/null || sudo systemctl restart httpd 2>/dev/null
+
+FIX D — If permissions issue (Apache can't read files):
+  sudo chown -R www-data:www-data /mnt/ext_ssd/html/
+  sudo chmod -R 755 /mnt/ext_ssd/html/
+  sudo systemctl restart apache2 2>/dev/null || sudo systemctl restart httpd 2>/dev/null
+
+Apply ALL fixes that match. After each fix, run:
+  curl -sI http://localhost/ 2>/dev/null
+
+──────────────────────────────────────────────────────────────
+STEP 7: FINAL VERIFICATION
+──────────────────────────────────────────────────────────────
+
+  curl -sI http://localhost/ 2>/dev/null
+  curl -s http://localhost/ 2>/dev/null | head -60
+
+Record the final HTTP status. If 200 → app is fixed. If still 500 → record the full error output.
+
+══════════════════════════════════════════════════════════════
+WRITE RESULTS TO (ABSOLUTE PATH): /mnt/ext_ssd/results/2026-05-01-fm-fix-002.txt
+══════════════════════════════════════════════════════════════
+
+Use this structure:
+
+## Step 0: Previous Results
+[output]
+
+## Step 1: File Map
+[output]
+
+## Step 2: Apache Config
+[output]
+
+## Step 3: HTTP Status Before Fix
+[output]
+
+## Step 4: Apache Error Log
+[output]
+
+## Step 5: PHP Error Output (with display_errors)
+[output]
+
+## Step 6: Fixes Applied
+Fix A applied: yes/no — [what exactly was done]
+Fix B applied: yes/no — [what exactly was done]
+Fix C applied: yes/no — [what exactly was done]
+Fix D applied: yes/no — [what exactly was done]
+
+## Step 7: Final Verification
+HTTP status after fix: [200 / 500 / other]
+[paste curl output]
+
+## Summary
+Root cause: [describe]
+Fix applied: [describe]
+App responding correctly: yes/no
+Next action needed: [if any]
