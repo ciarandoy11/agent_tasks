@@ -1,0 +1,88 @@
+TASK TYPE: BASH EXECUTION ON A LINUX SERVER
+THIS IS NOT AN N8N WORKFLOW TASK. DO NOT IMPORT, DEPLOY, OR TOUCH n8n IN ANY WAY.
+DO NOT call any n8n API. DO NOT read or write any n8n workflow files.
+YOUR ONLY JOB: inspect the server and determine where the Finance Manager app actually lives, and what path the web server is serving.
+
+---
+
+CONTEXT:
+Previous diagnostic showed:
+- http://localhost/index.php returns 404 File Not Found
+- /var/www/html/ is empty
+That means the app is either not deployed there, or Apache/Nginx is serving a different document root.
+
+Find the real deployment path and the active web-server config.
+
+---
+
+STEP 1 — Runtime identity and web root basics
+Run:
+  whoami
+  pwd
+  ls -la /var/www/
+  ls -la /var/www/html/
+
+Record exact output.
+
+STEP 2 — Active vhost / site config
+Run:
+  apachectl -S 2>&1 || httpd -S 2>&1 || nginx -T 2>&1 | head -n 200
+
+Record exact output.
+
+STEP 3 — Find configured document roots
+Run:
+  grep -R "DocumentRoot\|root " /etc/apache2 /etc/httpd /etc/nginx 2>/dev/null | head -n 200
+
+Record exact output.
+
+STEP 4 — Search for Finance Manager files
+Run:
+  find /var/www /srv /home -maxdepth 5 \( -iname "*finance*" -o -name "db.php" -o -name "index.php" \) 2>/dev/null | head -n 200
+
+Record exact output.
+
+STEP 5 — Inspect likely app directories
+If STEP 4 found candidate directories, run ls -la on the most likely 3 directories containing the app.
+If nothing relevant was found, write exactly: NO APP FILES FOUND
+
+Record exact output.
+
+STEP 6 — Curl against active localhost routes
+Run:
+  curl -I http://localhost/ 2>&1
+  curl -I http://localhost/index.php 2>&1
+
+Record exact output.
+
+---
+
+OUTPUT INSTRUCTIONS:
+Write ALL results to: results/2026-05-01-fm-deploy-probe-001.md
+
+Use this exact format:
+
+Task: 2026-05-01-fm-deploy-probe-001.txt
+Status: success | partial | failed
+Time: <ISO 8601 timestamp>
+Summary: <state the actual active document root, whether Finance Manager files were found anywhere, and what the next fix should be>
+
+## Step 1 — Basics
+<exact output>
+
+## Step 2 — Active vhost
+<exact output>
+
+## Step 3 — Configured document roots
+<exact output>
+
+## Step 4 — Search results
+<exact output>
+
+## Step 5 — Candidate directories
+<exact output>
+
+## Step 6 — Curl headers
+<exact output>
+
+DO NOT summarise or truncate any step output. Write it all.
