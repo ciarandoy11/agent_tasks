@@ -1,0 +1,241 @@
+═══════════════════════════════════════════════════════════════
+TASK TYPE: BASH EXECUTION ON LINUX SERVER (Raspberry Pi)
+DO NOT touch n8n. DO NOT deploy n8n workflows. DO NOT call any
+external APIs unless explicitly instructed below.
+ONLY run bash commands on the local server.
+═══════════════════════════════════════════════════════════════
+
+TASK ID: 2026-05-01-fm-fix-001
+OBJECTIVE: Diagnose and fix HTTP 500 errors in the Finance Manager PHP application
+OUTPUT FILE: results/2026-05-01-fm-fix-001.md
+
+═══════════════════════════════════════════════════════════════
+CONTEXT (READ BEFORE STARTING):
+- Application: Finance Manager (PHP/Apache on Ubuntu/Linux)
+- Server: Raspberry Pi
+- Document root: /mnt/ext_ssd/html/
+- Known issue: HTTP 500 errors on PHP files
+- PHP 8.4.20 is installed and confirmed working
+- Apache web server is running
+- Database: TiDB Cloud (remote MySQL-compatible, cloud-hosted)
+- Previous probes confirmed: files ARE in /mnt/ext_ssd/html/, no index.php found at root
+- Apache error logs could not be read in previous probes due to permissions
+═══════════════════════════════════════════════════════════════
+
+RUN EVERY STEP IN ORDER. DO NOT SKIP STEPS.
+Record ALL output for each step, even if it is an error.
+
+──────────────────────────────────────────────────────────────
+STEP 1: READ APACHE ERROR LOGS
+Goal: Find the actual PHP error causing the 500.
+──────────────────────────────────────────────────────────────
+
+Run each of the following, record the output of whichever succeeds:
+
+  sudo cat /var/log/apache2/error.log 2>/dev/null | tail -80
+  sudo cat /var/log/apache2/access.log 2>/dev/null | tail -30
+  sudo ls /var/log/apache2/ 2>/dev/null
+  sudo journalctl -u apache2 --no-pager -n 80 2>/dev/null
+  find /var/log -name "*.log" 2>/dev/null | head -20
+  find /mnt/ext_ssd -name "*.log" 2>/dev/null | head -10
+
+If none of the above produce Apache log content, run:
+  sudo apache2ctl -t 2>&1
+
+──────────────────────────────────────────────────────────────
+STEP 2: MAP THE DOCUMENT ROOT
+Goal: Know exactly what files are deployed.
+──────────────────────────────────────────────────────────────
+
+  ls -la /mnt/ext_ssd/html/
+  find /mnt/ext_ssd/html/ -maxdepth 3 -type f | sort
+  find /mnt/ext_ssd/html/ -name "*.php" | sort
+  find /mnt/ext_ssd/html/ -name "*.env" -o -name ".env" -o -name "config.php" -o -name "database.php" -o -name "db.php" -o -name "settings.php" 2>/dev/null
+
+──────────────────────────────────────────────────────────────
+STEP 3: CHECK FILE AND DIRECTORY PERMISSIONS
+Goal: Confirm Apache (www-data) can read the files.
+──────────────────────────────────────────────────────────────
+
+  stat /mnt/ext_ssd/html/
+  stat /mnt/ext_ssd/
+  ls -la /mnt/ext_ssd/html/*.php 2>/dev/null
+  id www-data 2>/dev/null
+  groups www-data 2>/dev/null
+  sudo -u www-data ls /mnt/ext_ssd/html/ 2>/dev/null
+
+──────────────────────────────────────────────────────────────
+STEP 4: READ APACHE VHOST CONFIGURATION
+Goal: Confirm Apache is serving from the right docroot and has PHP enabled.
+──────────────────────────────────────────────────────────────
+
+  sudo cat /etc/apache2/sites-enabled/* 2>/dev/null
+  sudo ls /etc/apache2/sites-enabled/ 2>/dev/null
+  sudo cat /etc/apache2/apache2.conf 2>/dev/null | grep -E "DocumentRoot|DirectoryIndex|AllowOverride|php"
+  sudo apache2ctl -S 2>/dev/null
+
+──────────────────────────────────────────────────────────────
+STEP 5: TEST PHP FILES WITH CURL (capture full headers + first 100 lines body)
+Goal: Identify which files return 500 and whether PHP is outputting errors.
+──────────────────────────────────────────────────────────────
+
+  curl -v http://localhost/ 2>&1 | head -50
+  curl -v http://localhost/index.php 2>&1 | head -50
+  curl -v http://localhost/login.php 2>&1 | head -50
+  curl -v http://localhost/admin.php 2>&1 | head -50
+  curl -v http://localhost/index.html 2>&1 | head -50
+
+──────────────────────────────────────────────────────────────
+STEP 6: READ KEY PHP FILES
+Goal: Check the entry point for obvious issues (missing includes, bad config, DB calls failing at load).
+──────────────────────────────────────────────────────────────
+
+Read the first 80 lines of each PHP file found in Step 2:
+  head -80 /mnt/ext_ssd/html/index.php 2>/dev/null
+  head -80 /mnt/ext_ssd/html/login.php 2>/dev/null
+  head -80 /mnt/ext_ssd/html/admin.php 2>/dev/null
+
+If there is a config/database file (found in Step 2), read it too:
+  cat /mnt/ext_ssd/html/config.php 2>/dev/null
+  cat /mnt/ext_ssd/html/database.php 2>/dev/null
+  cat /mnt/ext_ssd/html/db.php 2>/dev/null
+  cat /mnt/ext_ssd/html/.env 2>/dev/null
+
+──────────────────────────────────────────────────────────────
+STEP 7: PHP SYNTAX CHECK ALL PHP FILES
+Goal: Rule out syntax errors as the cause.
+──────────────────────────────────────────────────────────────
+
+  find /mnt/ext_ssd/html/ -name "*.php" -exec php -l {} \; 2>&1
+
+──────────────────────────────────────────────────────────────
+STEP 8: CHECK PHP EXTENSIONS AND CONFIGURATION
+Goal: Identify missing extensions (PDO, mysqli, mbstring, etc.).
+──────────────────────────────────────────────────────────────
+
+  php -m 2>/dev/null
+  php -r "echo phpversion();" 2>/dev/null
+  php -r "var_dump(extension_loaded('pdo'));" 2>/dev/null
+  php -r "var_dump(extension_loaded('pdo_mysql'));" 2>/dev/null
+  php -r "var_dump(extension_loaded('mysqli'));" 2>/dev/null
+  php -r "var_dump(extension_loaded('mbstring'));" 2>/dev/null
+  php -r "var_dump(extension_loaded('curl'));" 2>/dev/null
+
+──────────────────────────────────────────────────────────────
+STEP 9: ENABLE PHP ERROR DISPLAY TEMPORARILY TO SURFACE THE 500 CAUSE
+Goal: Get the actual PHP error output in the HTTP response.
+──────────────────────────────────────────────────────────────
+
+Add an .htaccess to enable error output:
+
+  sudo tee /mnt/ext_ssd/html/.htaccess > /dev/null << 'EOF'
+php_flag display_errors On
+php_value error_reporting 32767
+EOF
+
+Then re-test with curl to capture the error:
+  curl http://localhost/ 2>/dev/null | head -100
+  curl http://localhost/index.php 2>/dev/null | head -100
+  curl http://localhost/login.php 2>/dev/null | head -100
+
+Record the full output including any PHP error messages.
+Then remove the .htaccess (or restore original):
+  sudo rm /mnt/ext_ssd/html/.htaccess
+
+──────────────────────────────────────────────────────────────
+STEP 10: ATTEMPT FIXES BASED ON FINDINGS
+Goal: Fix the root cause. Choose the fix(es) matching what was found.
+──────────────────────────────────────────────────────────────
+
+FIX A — If database connection error (e.g. "Access denied", "Connection refused", "SQLSTATE"):
+  - Check if a .env or config file has the correct TiDB Cloud host, port (4000), user, pass, DB name
+  - Test TCP connectivity: nc -zv <tidb-host> 4000 2>&1
+  - If credentials look wrong, note them in the output — DO NOT change credentials without knowing the correct ones
+  - If connection times out, check if firewall blocks outbound to TiDB: sudo ufw status 2>/dev/null
+
+FIX B — If missing PHP extension (e.g. "Call to undefined function pdo_mysql"):
+  - sudo apt-get install -y php-mysql php-pdo php-mbstring php-curl 2>&1
+  - sudo systemctl restart apache2 2>&1
+  - Re-test with curl
+
+FIX C — If permission error (Apache can't read files):
+  - sudo chown -R www-data:www-data /mnt/ext_ssd/html/
+  - sudo chmod -R 755 /mnt/ext_ssd/html/
+  - sudo systemctl restart apache2 2>&1
+  - Re-test with curl
+
+FIX D — If no index.php / wrong entry point:
+  - Check if the main file has a different name (app.php, main.php, public/index.php)
+  - If the actual entry point is in a subdirectory (e.g. /public/), update Apache vhost DocumentRoot:
+      sudo sed -i 's|DocumentRoot /mnt/ext_ssd/html|DocumentRoot /mnt/ext_ssd/html/public|g' /etc/apache2/sites-enabled/*.conf 2>/dev/null
+      sudo systemctl restart apache2 2>&1
+      curl -I http://localhost/ 2>/dev/null
+
+FIX E — If missing config file:
+  - Look for a config.sample.php, .env.example, or similar template
+  - Copy it: cp /mnt/ext_ssd/html/config.sample.php /mnt/ext_ssd/html/config.php
+  - Note any fields that need real values filled in
+
+Apply ALL relevant fixes. DO NOT apply fixes that conflict with each other.
+After each fix, run: curl -I http://localhost/ 2>/dev/null and record the HTTP status code.
+
+──────────────────────────────────────────────────────────────
+STEP 11: FINAL VERIFICATION
+Goal: Confirm whether the app is fixed or still broken.
+──────────────────────────────────────────────────────────────
+
+  curl -I http://localhost/ 2>/dev/null
+  curl http://localhost/ 2>/dev/null | head -50
+
+Record the final HTTP status code. If still 500, record the full error output.
+
+──────────────────────────────────────────────────────────────
+WRITE RESULTS TO: results/2026-05-01-fm-fix-001.md
+──────────────────────────────────────────────────────────────
+
+Use this exact structure:
+
+## Step 1: Apache Error Logs
+[paste full output]
+
+## Step 2: Document Root File Map
+[paste full output]
+
+## Step 3: File Permissions
+[paste full output]
+
+## Step 4: Apache Vhost Config
+[paste full output]
+
+## Step 5: Curl Tests (before fix)
+[paste full output]
+
+## Step 6: PHP File Contents
+[paste full output]
+
+## Step 7: Syntax Checks
+[paste full output]
+
+## Step 8: PHP Extensions
+[paste full output]
+
+## Step 9: Error Display Output (actual PHP error)
+[paste full output]
+
+## Step 10: Fixes Applied
+Fix A applied: yes/no — [what was done]
+Fix B applied: yes/no — [what was done]
+Fix C applied: yes/no — [what was done]
+Fix D applied: yes/no — [what was done]
+Fix E applied: yes/no — [what was done]
+
+## Step 11: Final Verification
+HTTP status after fix: [200 / 500 / other]
+[paste curl output]
+
+## Summary
+Root cause identified: [yes/no — describe it]
+Fix attempted: [yes/no — describe it]
+Fix succeeded: [yes/no]
+App responding correctly: [yes/no]
+Next action needed: [describe what still needs to happen, if anything]
