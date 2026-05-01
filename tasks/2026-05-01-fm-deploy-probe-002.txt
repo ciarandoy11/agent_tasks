@@ -1,0 +1,33 @@
+BASH EXECUTION ON A LINUX SERVER — DO NOT TOUCH n8n. DO NOT IMPORT WORKFLOWS. DO NOT CALL APIs.
+
+YOU ARE A BASH AGENT. READ THIS TASK CAREFULLY AND EXECUTE ONLY WHAT IS LISTED.
+
+TASK: Finance Manager — locate application files and identify HTTP 500 root cause
+
+CONTEXT:
+- Apache document root is /mnt/ext_ssd/html (confirmed from /etc/httpd/conf/httpd.conf)
+- /var/www/html is empty
+- Finance Manager is a PHP web app returning HTTP 500
+
+STEP 1 — List the contents of /mnt/ext_ssd/html:
+  ls -la /mnt/ext_ssd/html/
+
+STEP 2 — If Finance Manager files are present, check Apache error log for the 500:
+  tail -50 /var/log/httpd/error_log
+  OR if that path doesn't exist:
+  find /var/log -name "error*" -type f 2>/dev/null | head -5
+  then tail -50 on whichever error log is found
+
+STEP 3 — Test a direct HTTP request to the app:
+  curl -v http://localhost/ 2>&1 | head -60
+
+STEP 4 — Check PHP is working:
+  php -r "echo 'PHP OK';"
+  php --version
+
+STEP 5 — If any .php files exist in /mnt/ext_ssd/html, check for syntax errors:
+  find /mnt/ext_ssd/html -name "*.php" | head -10
+  php -l /mnt/ext_ssd/html/index.php   (if index.php exists)
+
+OUTPUT: Write ALL results to results/2026-05-01-fm-deploy-probe-002.txt
+Include the exact stdout/stderr of each command, clearly labelled by step number.
