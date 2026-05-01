@@ -1,0 +1,121 @@
+BASH EXECUTION ON A LINUX SERVER — READ THIS FIRST
+====================================================
+- This is a raw bash execution task. Run every command listed below in sequence.
+- DO NOT attempt any n8n workflow deployment.
+- DO NOT use `sudo` for any command — all steps must run as the current user (ciaran).
+- Write ALL output to: /mnt/ext_ssd/results/2026-05-01-fm-fix-003.txt
+- Output path is ABSOLUTE. Do not use relative paths.
+
+CONTEXT
+-------
+Finance Manager is a PHP app on a Raspberry Pi.
+- Document root: /mnt/ext_ssd/html/
+- PHP 8.4.20 is installed and healthy
+- Apache is the web server
+- Database: TiDB Cloud (port 4000)
+- The root URL returns 403/500 — no index.php found at root in previous probes
+- The agent cannot use sudo (password required in non-interactive shell)
+
+GOAL
+----
+Map the full app file structure, read key files, attempt to fix the missing entry point
+and display_errors using only non-privileged commands, then verify with curl.
+
+STEP 1 — Full file map (no sudo needed)
+----------------------------------------
+find /mnt/ext_ssd/html/ -type f 2>&1
+echo "---END FILE MAP---"
+
+STEP 2 — Apache vhost config (may be world-readable)
+------------------------------------------------------
+cat /etc/apache2/sites-enabled/*.conf 2>&1
+cat /etc/apache2/sites-available/*.conf 2>&1
+echo "---END APACHE CONFIG---"
+
+STEP 3 — Apache error log (attempt without sudo)
+-------------------------------------------------
+cat /var/log/apache2/error.log 2>&1 | tail -50
+cat /var/log/apache2/error_log 2>&1 | tail -50
+echo "---END ERROR LOG---"
+
+STEP 4 — Read all PHP files in root (up to 100 lines each)
+-----------------------------------------------------------
+for f in /mnt/ext_ssd/html/*.php; do
+  echo "=== FILE: $f ==="
+  head -100 "$f" 2>&1
+  echo "---"
+done
+echo "---END PHP FILES---"
+
+STEP 5 — Read subdirectory structure one level deep
+-----------------------------------------------------
+ls -la /mnt/ext_ssd/html/ 2>&1
+for d in /mnt/ext_ssd/html/*/; do
+  echo "=== DIR: $d ==="
+  ls -la "$d" 2>&1
+done
+echo "---END DIR LISTING---"
+
+STEP 6 — Create .htaccess to enable PHP error display
+------------------------------------------------------
+cat > /mnt/ext_ssd/html/.htaccess << 'EOF'
+php_flag display_errors on
+php_value error_reporting 32767
+EOF
+echo "htaccess write result: $?"
+cat /mnt/ext_ssd/html/.htaccess 2>&1
+echo "---END HTACCESS---"
+
+STEP 7 — Create a diagnostic index.php at root
+-----------------------------------------------
+# Only create if index.php does NOT already exist at root
+if [ ! -f /mnt/ext_ssd/html/index.php ]; then
+  cat > /mnt/ext_ssd/html/index.php << 'EOF'
+<?php
+error_reporting(E_ALL);
+ini_set('display_errors', '1');
+echo "<h1>FM Diagnostic Entry Point</h1>";
+echo "<pre>";
+echo "PHP version: " . phpversion() . "
+";
+echo "Document root: " . $_SERVER['DOCUMENT_ROOT'] . "
+";
+echo "Script: " . $_SERVER['SCRIPT_FILENAME'] . "
+";
+$files = scandir('/mnt/ext_ssd/html/');
+echo "Files in docroot:
+";
+print_r($files);
+echo "</pre>";
+EOF
+  echo "index.php created: $?"
+else
+  echo "index.php already exists — skipping creation"
+fi
+echo "---END INDEX.PHP STEP---"
+
+STEP 8 — curl test
+-------------------
+curl -v http://localhost/ 2>&1 | head -80
+curl -v http://localhost/index.php 2>&1 | head -80
+echo "---END CURL TEST---"
+
+STEP 9 — Check file ownership and permissions on docroot
+---------------------------------------------------------
+ls -la /mnt/ext_ssd/html/ 2>&1
+stat /mnt/ext_ssd/html/ 2>&1
+id 2>&1
+echo "---END PERMISSIONS---"
+
+STEP 10 — Summary
+------------------
+Echo a plain-English summary of:
+- What the entry point appears to be (or wasn't found)
+- Whether curl returned HTTP 200, 403, or 500 after changes
+- What the actual PHP error is (if any showed up in curl output or logs)
+- What the next recommended fix step is
+Label it: "=== SUMMARY ==="
+
+OUTPUT
+------
+Write everything above to: /mnt/ext_ssd/results/2026-05-01-fm-fix-003.txt
