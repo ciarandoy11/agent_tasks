@@ -1,0 +1,170 @@
+TASK: Finance Manager HTTP 500 Fix — Corrected Path
+TARGET: /mnt/ext_ssd/finance_manager
+DATE: 2026-05-02
+OUTPUT: results/2026-05-02-fm-fix-unblocked-002.md
+
+You are an autonomous bash agent with full sudo NOPASSWD access. Execute every step in order. Log every command AND its full output to results/2026-05-02-fm-fix-unblocked-002.md before moving to the next step. Do not skip steps. Do not summarise — paste raw output.
+
+==============================================================
+STEP 1: APACHE ERROR LOGS
+==============================================================
+Run:
+  sudo tail -n 300 /var/log/apache2/error.log
+  sudo journalctl -u apache2 --since "2 days ago" --no-pager | tail -n 200
+
+Record every line mentioning "finance", "500", "PHP", "Fatal", "Warning", "Permission denied", or "No such file".
+
+==============================================================
+STEP 2: VIRTUAL HOST CONFIGURATION
+==============================================================
+Run:
+  sudo apache2ctl -S
+  sudo cat /etc/apache2/sites-enabled/*.conf
+
+Confirm whether DocumentRoot points to /mnt/ext_ssd/finance_manager or a subdirectory. Record the exact DocumentRoot value.
+
+==============================================================
+STEP 3: DIRECTORY PERMISSIONS
+==============================================================
+Run:
+  ls -la /mnt/ext_ssd/finance_manager/
+  ls -la /mnt/ext_ssd/finance_manager/public/ 2>/dev/null || echo "No public/ subdir"
+  sudo chown -R www-data:www-data /mnt/ext_ssd/finance_manager/
+  sudo chmod -R 755 /mnt/ext_ssd/finance_manager/
+  sudo find /mnt/ext_ssd/finance_manager/ -name "*.php" -exec chmod 644 {} \;
+
+Record the original ls output (before chown/chmod) so we can see what was wrong.
+
+==============================================================
+STEP 4: PHP SYNTAX CHECK — ALL PHP FILES
+==============================================================
+Run:
+  sudo find /mnt/ext_ssd/finance_manager/ -name "*.php" | while read f; do php -l "$f" 2>&1; done | grep -v "No syntax errors detected"
+
+If any syntax errors are found, record the exact file and line number. Also paste the relevant lines from those files.
+
+==============================================================
+STEP 5: PHP AND APACHE ERROR LOGS (APP-LEVEL)
+==============================================================
+Run:
+  php -i 2>/dev/null | grep "^error_log"
+  sudo find /var/log -name "php*.log" 2>/dev/null | xargs sudo tail -n 100 2>/dev/null
+  sudo tail -n 100 /var/log/apache2/finance_manager*.log 2>/dev/null || echo "No app-specific log found"
+
+Record everything returned.
+
+==============================================================
+STEP 6: CHECK APACHE MODULES
+==============================================================
+Run:
+  apache2ctl -M 2>&1 | grep -E "php|rewrite|ssl|headers"
+  php --version
+  php -m | grep -E "pdo|mysql|curl|json|mbstring"
+
+Confirm mod_php or php-fpm is active. Record the PHP version.
+
+==============================================================
+STEP 7: ENABLE PHP ERROR DISPLAY
+==============================================================
+Run:
+  sudo find /etc/php -name "php.ini" -path "*/apache2/*" 2>/dev/null
+  # For each php.ini found, enable display_errors:
+  sudo sed -i 's/^display_errors\s*=\s*Off/display_errors = On/Ig' /etc/php/*/apache2/php.ini 2>/dev/null
+  sudo sed -i 's/^error_reporting\s*=.*/error_reporting = E_ALL/Ig' /etc/php/*/apache2/php.ini 2>/dev/null
+  sudo systemctl restart apache2
+
+Confirm apache2 restarted cleanly (check status).
+
+==============================================================
+STEP 8: CURL LOCAL ENDPOINTS
+==============================================================
+Run:
+  curl -sv http://localhost/ 2>&1
+  curl -sv http://localhost/index.php 2>&1
+  # If a custom port is configured in the vhost, also try that port.
+
+Record the full response including HTTP status code, headers, and body. With display_errors now On, the body should reveal the actual PHP error causing the 500.
+
+==============================================================
+STEP 9: DATABASE CONFIGURATION
+==============================================================
+Run:
+  sudo grep -rn --include="*.php" --include="*.env" --include="*.json" --include="*.ini" --include="*.config" \
+    -E "host|dbname|DSN|PDO|mysqli|DB_HOST|DB_NAME|DB_USER|DB_PORT" \
+    /mnt/ext_ssd/finance_manager/ -l 2>/dev/null
+
+For each config file found, display its contents (replace actual passwords with [REDACTED]):
+  sudo cat <config_file> | sed -E 's/(password|pass|passwd|secret)\s*[=:]\s*\S+/\1 = [REDACTED]/gi'
+
+Then test DB connectivity using values from the config:
+  php -r "
+    try {
+      \$pdo = new PDO('mysql:host=<HOST>;port=<PORT>;dbname=<DBNAME>', '<USER>', '<PASS>');
+      echo 'DB OK
+';
+    } catch (Exception \$e) {
+      echo 'DB ERROR: ' . \$e->getMessage() . \"
+\";
+    }
+  " 2>&1
+
+Replace placeholders with actual config values. Record the result.
+
+==============================================================
+STEP 10: .HTACCESS CHECK
+==============================================================
+Run:
+  sudo find /mnt/ext_ssd/finance_manager/ -name ".htaccess" | xargs sudo cat 2>/dev/null
+
+Look for any RewriteRule, deny, or Options directives that could cause a 500.
+
+==============================================================
+STEP 11: WRITE DIAGNOSTIC SUMMARY TO RESULTS FILE
+==============================================================
+Write to results/2026-05-02-fm-fix-unblocked-002.md:
+
+# FM Fix Results — 2026-05-02-fm-fix-unblocked-002
+
+## 1. Apache Error Log (relevant lines)
+[paste]
+
+## 2. Virtual Host — DocumentRoot
+[paste exact value]
+
+## 3. Permissions Before Fix
+[paste original ls -la output]
+
+## 4. PHP Syntax Errors
+[paste any errors, or "None found"]
+
+## 5. PHP Error Log
+[paste]
+
+## 6. Apache Modules / PHP Version
+[paste]
+
+## 7. curl http://localhost/index.php output
+[paste full response body — this is the key diagnostic]
+
+## 8. DB Config Files Found
+[paste paths]
+
+## 9. DB Connection Test Result
+[paste]
+
+## 10. .htaccess Contents
+[paste]
+
+## ROOT CAUSE ASSESSMENT
+[Your analysis of what is causing the 500 based on the above]
+
+## RECOMMENDED FIX
+[Exact commands to fix the root cause, ready to execute]
+
+==============================================================
+IMPORTANT NOTES:
+- The app path is /mnt/ext_ssd/finance_manager — NOT /mnt/ext_ssd/html
+- Write all output to results/2026-05-02-fm-fix-unblocked-002.md
+- Do not truncate output — paste everything
+- sudo is available without a password
+==============================================================
