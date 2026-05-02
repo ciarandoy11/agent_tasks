@@ -1,0 +1,32 @@
+OBJECTIVE: Diagnose and resolve HTTP 500 errors on Finance Manager application at /mnt/ext_ssd/html/ using newly granted sudo permissions.
+
+STEPS:
+1. ENVIRONMENT & PERMISSIONS CHECK
+   - Run `whoami` to confirm execution user.
+   - Run `sudo ls -laR /mnt/ext_ssd/html/` to map the full directory structure and verify ownership/permissions.
+   - Run `sudo ls -la /var/log/apache2/` to check for access to error logs.
+
+2. LOG ANALYSIS (CRITICAL)
+   - Run `sudo tail -n 100 /var/log/apache2/error.log` to capture the most recent PHP/Apache errors.
+   - Run `sudo journalctl -u apache2 --since "10 minutes ago"` to catch system-level service failures.
+
+3. PHP SYNTAX & CONFIGURATION
+   - Run `php -v` to confirm version (expected 8.4.20).
+   - Run `php -m` to list active extensions (specifically check for pdo_mysql, mysqli, curl, mbstring).
+   - Run `find /mnt/ext_ssd/html/ -name "*.php" -exec php -l {} \;` to syntax-check every PHP file in the root and subdirectories.
+
+4. WEB SERVER CONFIGURATION
+   - Run `sudo apache2ctl -S` to verify VirtualHost mapping.
+   - Run `cat /etc/apache2/sites-enabled/*.conf` to check the DocumentRoot and Directory permissions.
+
+5. ACTIVE FIX ATTEMPTS
+   - If permissions are incorrect: `sudo chown -R www-data:www-data /mnt/ext_ssd/html/` and `sudo chmod -R 755 /mnt/ext_ssd/html/`.
+   - If missing index.php is the cause for 403/500, check for alternative entry points (e.g., public/index.php).
+   - Restart the service: `sudo systemctl restart apache2`.
+
+6. VERIFICATION
+   - Run `curl -i http://localhost/` and capture full output headers and body.
+   - Run `curl -i http://localhost/index.php` (or discovered entry point).
+
+7. REPORTING
+   - Write all stdout/stderr from these steps to `results/2026-05-02-fm-fix-unblocked-001.md`. Ensure the file is pushed back to the repository.
