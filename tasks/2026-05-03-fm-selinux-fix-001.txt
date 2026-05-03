@@ -1,0 +1,50 @@
+TASK: Finance Manager - Fix SELinux Context and Finalize Apache Mapping
+TARGET: Raspberry Pi (Fedora/Ultramarine OS)
+APP PATH: /mnt/ext_ssd/finance_manager
+OUTPUT FILE: results/2026-05-03-fm-selinux-fix-001.txt (write to repo results/ folder)
+
+ROOT CAUSE CONFIRMED: SELinux is blocking Apache (httpd) from accessing /mnt/ext_ssd/finance_manager.
+Apache user: apache. Service: httpd. Logs: /var/log/httpd/
+
+EXECUTE THE FOLLOWING STEPS IN ORDER:
+
+1. FIX SELINUX CONTEXTS (persistent)
+   sudo chcon -R -t httpd_sys_content_t /mnt/ext_ssd/finance_manager
+   sudo semanage fcontext -a -t httpd_sys_content_t "/mnt/ext_ssd/finance_manager(/.*)?"
+   sudo restorecon -R -v /mnt/ext_ssd/finance_manager
+   Capture output.
+
+2. WRITE APACHE ALIAS CONFIG
+   sudo tee /etc/httpd/conf.d/finance_manager.conf > /dev/null << 'EOF'
+   Alias /finance_manager "/mnt/ext_ssd/finance_manager"
+   <Directory "/mnt/ext_ssd/finance_manager">
+       Options Indexes FollowSymLinks
+       AllowOverride All
+       Require all granted
+       DirectoryIndex index.php finance_manager.php login.php
+   </Directory>
+   EOF
+
+3. FIX PERMISSIONS
+   sudo chown -R apache:apache /mnt/ext_ssd/finance_manager
+   sudo chmod -R 755 /mnt/ext_ssd/finance_manager
+
+4. VALIDATE AND RESTART
+   sudo httpd -t
+   sudo systemctl restart httpd
+   sleep 3
+
+5. TEST ENDPOINTS
+   curl -o /dev/null -w "%{http_code}" -s http://localhost/finance_manager/
+   curl -o /dev/null -w "%{http_code}" -s http://localhost/finance_manager/finance_manager.php
+   curl -o /dev/null -w "%{http_code}" -s http://localhost/finance_manager/login.php
+
+6. CAPTURE ERROR LOG
+   sudo tail -50 /var/log/httpd/error_log
+
+7. SUMMARISE RESULT
+   - SUCCESS: finance_manager.php returns 200
+   - PARTIAL: returns 500 (routing works, app-level error next)
+   - FAILED: still 404 or other — capture full log excerpt
+
+Write all output to results/2026-05-03-fm-selinux-fix-001.txt in the repo.
