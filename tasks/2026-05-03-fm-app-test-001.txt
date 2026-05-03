@@ -1,0 +1,26 @@
+TASK: Finance Manager — Application-Level Testing
+TARGET: /mnt/ext_ssd/finance_manager on Fedora/Ultramarine Pi
+APACHE SERVICE: httpd | USER: apache | LOGS: /var/log/httpd/
+
+CONTEXT:
+- Infrastructure is now confirmed working: SELinux contexts applied, Apache alias live, 302 returned from finance_manager.php (redirecting to login — expected behaviour)
+- Previous blockers (404, SELinux, wrong OS assumptions) are all resolved
+- Now need to verify the app itself is functional end-to-end
+
+STEPS:
+1. Follow the 302 redirect from http://localhost/finance_manager/finance_manager.php and capture the final destination URL and HTTP status
+2. Curl the login page (wherever the redirect lands, likely login.php) and capture HTTP status + any visible HTML/errors
+3. Check /var/log/httpd/error_log for any PHP or app errors from recent requests (last 50 lines)
+4. Check /var/log/httpd/access_log for the last 20 request entries to confirm routing is live
+5. Test whether login.php can be reached directly: curl -v http://localhost/finance_manager/login.php
+6. Check if a database config file exists (e.g. config.php, db.php, .env) in /mnt/ext_ssd/finance_manager — DO NOT print credentials, just confirm the file exists and whether DB host/name fields are populated
+7. If PHP errors are present in logs, capture and report the exact error message and line number
+8. Summarise: is the app serving pages? Is there a DB connection error? Is there any visible PHP fatal/warning blocking the app?
+
+OUTPUT:
+- HTTP status of login page
+- Any PHP/DB errors from logs
+- Whether the app is rendering HTML or throwing errors
+- Clear next step recommendation
+
+Write results to: results/2026-05-03-fm-app-test-001.txt
