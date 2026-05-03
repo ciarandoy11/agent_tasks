@@ -1,0 +1,20 @@
+Task: 2026-05-03-fm-fix-retry-001
+Status: Retrying FM fix after Saturday result failed to write back. 
+
+1. Environment Check:
+   - ls -la /mnt/ext_ssd/finance_manager
+   - Check for .htaccess issues: cat /mnt/ext_ssd/finance_manager/.htaccess
+
+2. Log Analysis (Sudo):
+   - sudo tail -n 100 /var/log/apache2/error.log
+   - sudo journalctl -u apache2 --since "1 hour ago"
+
+3. Execution:
+   - Fix ownership: sudo chown -R www-data:www-data /mnt/ext_ssd/finance_manager
+   - Restart Apache: sudo systemctl restart apache2
+
+4. Validation:
+   - curl -iv http://localhost/finance_manager/index.php
+   - If 500 persists, check php-fpm logs if applicable.
+
+5. Write results to results/2026-05-03-fm-fix-retry-001.txt
