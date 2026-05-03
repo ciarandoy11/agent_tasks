@@ -1,0 +1,28 @@
+The Fedora-corrected diagnosis and fix have been executed. The full results are saved at `/mnt/ext_ssd/results/2026-05-03-fm-fix-fedora-001.txt`.
+
+### 🚨 Critical Analysis: The "Root Cause" found
+The issue is **not a 500 Error**, but a **404 Not Found**, and the cause is a missing Apache Alias or DocumentRoot configuration.
+
+**The Evidence:**
+1.  **Files Exist:** `ls -la` confirms that `finance_manager.php` and `login.php` are physically present in `/mnt/ext_ssd/finance_manager/`.
+2.  **PHP is Healthy:** `php -l` shows no syntax errors.
+3.  **Apache is Running:** `curl http://localhost/` returns a `200 OK` (serving the main site).
+4.  **The Failure:** `curl http://localhost/finance_manager/finance_manager.php` returns a `404 Not Found`.
+5.  **The Config Gap:** The output of `sudo ls /etc/httpd/conf.d/` shows only `php.conf`, `userdir.conf`, and `autoindex.conf`. **There is no configuration file that tells Apache that the URL path `/finance_manager` should map to the physical directory `/mnt/ext_ssd/finance_manager/`.**
+
+### Summary of Actions Taken:
+*   **Permissions Fixed:** Ownership set to `apache:apache` and permissions to `755`.
+*   **Entry Point Added:** Created a redirect `index.php` in the app folder.
+*   **Service Restarted:** `httpd` was restarted successfully.
+
+### Next Required Step:
+To fix this, a new Apache configuration file (e.g., `/etc/httpd/conf.d/finance_manager.conf`) must be created with an `Alias` directive:
+```apache
+Alias /finance_manager "/mnt/ext_ssd/finance_manager"
+<Directory "/mnt/ext_ssd/finance_manager">
+    Options Indexes FollowSymLinks
+    AllowOverride All
+    Require all granted
+</Directory>
+```
+Without this mapping, Apache looks for the folder in the default DocumentRoot (usually `/var/www/html`), where it does not exist.
