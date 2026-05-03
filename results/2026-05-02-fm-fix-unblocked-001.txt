@@ -1,0 +1,5 @@
+The attempt to deploy the n8n workflow failed because the hostname `host.docker.internal` could not be resolved. This indicates a networking issue between the execution environment and the n8n instance.
+
+**Error:** `curl: (6) Could not resolve host: host.docker.internal`
+
+I will notify the Orchestrator of this failure.
