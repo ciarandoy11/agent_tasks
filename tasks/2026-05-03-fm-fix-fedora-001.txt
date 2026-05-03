@@ -1,0 +1,87 @@
+## Finance Manager - Fedora-Correct Diagnosis & Fix
+
+### Environment (confirmed from prior run)
+- OS: Fedora/Ultramarine (NOT Debian/Ubuntu)
+- Apache service: `httpd` (not apache2)
+- Apache user: `apache` (not www-data)
+- Apache logs: `/var/log/httpd/` (not /var/log/apache2/)
+- App path: /mnt/ext_ssd/finance_manager/
+- Known files: finance_manager.php, login.php (NO index.php exists)
+
+### Goal
+Diagnose and fix the HTTP 500 error on Finance Manager. The app entry points are finance_manager.php and login.php.
+
+### Steps
+
+1. **Read actual Apache error logs**
+```bash
+sudo tail -100 /var/log/httpd/error_log
+sudo tail -50 /var/log/httpd/ssl_error_log 2>/dev/null || echo "no ssl log"
+```
+
+2. **List full directory contents**
+```bash
+ls -la /mnt/ext_ssd/finance_manager/
+ls -la /mnt/ext_ssd/finance_manager/*.php 2>/dev/null | head -30
+```
+
+3. **PHP syntax check on all PHP files**
+```bash
+find /mnt/ext_ssd/finance_manager/ -name "*.php" | xargs -I{} php -l {}
+```
+
+4. **Enable PHP error display temporarily and curl the actual entry points**
+```bash
+# Check current PHP error settings
+php -r "echo ini_get('display_errors') . PHP_EOL;"
+
+# Curl the real entry points (not index.php which doesn't exist)
+curl -v http://localhost/finance_manager/finance_manager.php 2>&1 | head -60
+curl -v http://localhost/finance_manager/login.php 2>&1 | head -60
+
+# Also try the domain if known
+curl -v http://localhost/ 2>&1 | head -40
+```
+
+5. **Check Apache vhost config**
+```bash
+sudo cat /etc/httpd/conf/httpd.conf | tail -30
+sudo ls /etc/httpd/conf.d/
+sudo cat /etc/httpd/conf.d/*.conf 2>/dev/null | head -80
+```
+
+6. **Fix file ownership with correct Fedora user**
+```bash
+sudo chown -R apache:apache /mnt/ext_ssd/finance_manager/
+sudo chmod -R 755 /mnt/ext_ssd/finance_manager/
+```
+
+7. **Create index.php if needed** (only if vhost expects it)
+```bash
+# Check if DirectoryIndex is set to index.php
+grep -i DirectoryIndex /etc/httpd/conf/httpd.conf /etc/httpd/conf.d/*.conf 2>/dev/null
+
+# If so, create a redirect index.php
+cat > /mnt/ext_ssd/finance_manager/index.php << 'EOF'
+<?php
+header('Location: finance_manager.php');
+exit;
+EOF
+sudo chown apache:apache /mnt/ext_ssd/finance_manager/index.php
+```
+
+8. **Restart httpd and revalidate**
+```bash
+sudo systemctl restart httpd
+sleep 2
+curl -o /dev/null -w "%{http_code}" http://localhost/finance_manager/finance_manager.php
+curl -o /dev/null -w "%{http_code}" http://localhost/finance_manager/login.php
+```
+
+9. **Output the last 30 lines of error log after restart**
+```bash
+sudo tail -30 /var/log/httpd/error_log
+```
+
+### Write results to: results/2026-05-03-fm-fix-fedora-001.txt
+Include: error log excerpts, PHP syntax check output, curl HTTP status codes, what was fixed, what still fails.
