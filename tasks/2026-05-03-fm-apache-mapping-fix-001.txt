@@ -1,0 +1,81 @@
+## Finance Manager - Apache Mapping Fix
+
+### What the last result proved
+- This is **not** a PHP syntax issue.
+- This is **not** an httpd service/user issue anymore.
+- The current failure is a **404 Not Found** because Apache has no mapping from the requested Finance Manager URL to `/mnt/ext_ssd/finance_manager`.
+- Fedora/Ultramarine rules apply: service=`httpd`, user=`apache`, logs=`/var/log/httpd/`.
+
+### Objective
+Create the missing Apache mapping so Finance Manager is actually reachable, then validate whether the app loads or whether a deeper application error appears after routing is fixed.
+
+### Steps
+
+1. **Inspect current Apache routing state**
+```bash
+sudo grep -Rni "finance_manager\|financemanager.ofsoftware.ie\|DocumentRoot\|Alias\|VirtualHost" /etc/httpd/conf /etc/httpd/conf.d 2>/dev/null
+sudo ls -la /etc/httpd/conf.d/
+sudo httpd -t
+```
+
+2. **Implement the missing mapping**
+Use the simplest working config if nothing already exists for Finance Manager.
+
+Create `/etc/httpd/conf.d/finance_manager.conf` with:
+```apache
+Alias /finance_manager "/mnt/ext_ssd/finance_manager"
+<Directory "/mnt/ext_ssd/finance_manager">
+    Options Indexes FollowSymLinks
+    AllowOverride All
+    Require all granted
+    DirectoryIndex index.php finance_manager.php login.php
+</Directory>
+```
+
+3. **Confirm the app directory is readable by Apache**
+```bash
+sudo chown -R apache:apache /mnt/ext_ssd/finance_manager/
+sudo chmod -R 755 /mnt/ext_ssd/finance_manager/
+ls -la /mnt/ext_ssd/finance_manager/
+```
+
+4. **Validate config and reload Apache**
+```bash
+sudo httpd -t
+sudo systemctl restart httpd
+sleep 2
+sudo systemctl status httpd --no-pager | head -30
+```
+
+5. **Test the real endpoints after mapping exists**
+```bash
+curl -I http://localhost/finance_manager/
+curl -I http://localhost/finance_manager/finance_manager.php
+curl -I http://localhost/finance_manager/login.php
+curl -s http://localhost/finance_manager/finance_manager.php | head -60
+curl -s http://localhost/finance_manager/login.php | head -60
+```
+
+6. **If the URL now reaches PHP but returns 500 or blank output, capture the real app error**
+```bash
+sudo tail -80 /var/log/httpd/error_log
+sudo tail -40 /var/log/httpd/access_log 2>/dev/null || echo "no access_log"
+```
+
+7. **If localhost path works, also test the public host header**
+```bash
+curl -I -H "Host: financemanager.ofsoftware.ie" http://127.0.0.1/
+curl -s -H "Host: financemanager.ofsoftware.ie" http://127.0.0.1/ | head -60
+```
+If that fails differently, include the exact result.
+
+### Output
+Write results to: `results/2026-05-03-fm-apache-mapping-fix-001.txt`
+
+Include:
+- whether `finance_manager.conf` was created/updated
+- output of `httpd -t`
+- HTTP status codes for `/finance_manager/`, `finance_manager.php`, and `login.php`
+- whether public host-header testing behaves differently
+- last relevant Apache error log lines
+- whether FM is now reachable, and if not, the exact next blocker
