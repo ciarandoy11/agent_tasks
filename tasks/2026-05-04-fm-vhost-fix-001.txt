@@ -1,0 +1,66 @@
+## Task: Fix Finance Manager VirtualHost for financemanager.ofsoftware.ie
+
+### Context
+- OS: Fedora/Ultramarine (NOT Debian/Ubuntu)
+- Apache service: httpd (NOT apache2)
+- Apache user: apache
+- Apache config dir: /etc/httpd/conf.d/
+- App path: /mnt/ext_ssd/finance_manager
+- External domain: financemanager.ofsoftware.ie
+- Current state: localhost curl returns 200 via alias, but external domain returns HTTP 500
+- Root cause hypothesis: Apache alias exists but no VirtualHost for the domain — domain hits default VirtualHost with wrong DocumentRoot
+
+### Steps
+
+1. Check current Apache config for financemanager domain:
+   grep -r "financemanager" /etc/httpd/conf.d/ || echo "NO_VHOST_FOUND"
+   cat /etc/httpd/conf.d/finance_manager.conf || echo "CONF_MISSING"
+
+2. Check what the default VirtualHost is serving:
+   grep -r "DocumentRoot" /etc/httpd/conf/ /etc/httpd/conf.d/ 2>/dev/null
+
+3. Check Apache error log for the actual 500 error (domain hits):
+   tail -50 /var/log/httpd/error_log
+   tail -50 /var/log/httpd/financemanager.ofsoftware.ie-error.log 2>/dev/null || echo "NO_DOMAIN_LOG"
+
+4. Write a correct VirtualHost config (overwrite existing finance_manager.conf):
+   cat > /etc/httpd/conf.d/finance_manager.conf << 'EOF'
+   <VirtualHost *:80>
+       ServerName financemanager.ofsoftware.ie
+       DocumentRoot /mnt/ext_ssd/finance_manager
+
+       <Directory /mnt/ext_ssd/finance_manager>
+           Options Indexes FollowSymLinks
+           AllowOverride All
+           Require all granted
+       </Directory>
+
+       ErrorLog /var/log/httpd/financemanager-error.log
+       CustomLog /var/log/httpd/financemanager-access.log combined
+   </VirtualHost>
+   EOF
+
+5. Ensure correct SELinux context and permissions on app directory:
+   chcon -R -t httpd_sys_content_t /mnt/ext_ssd/finance_manager
+   chown -R apache:apache /mnt/ext_ssd/finance_manager
+   chmod -R 755 /mnt/ext_ssd/finance_manager
+
+6. Validate Apache config and restart:
+   httpd -t && systemctl restart httpd
+   echo "RESTART_STATUS: $?"
+
+7. Test the actual domain endpoint:
+   curl -v -L http://financemanager.ofsoftware.ie/login.php 2>&1 | head -60
+
+8. If still 500, capture the new error log immediately:
+   tail -30 /var/log/httpd/financemanager-error.log 2>/dev/null
+   tail -30 /var/log/httpd/error_log
+
+### Expected output
+- VirtualHost config written
+- httpd -t passes
+- curl to domain returns 200 or 302 (not 500)
+- If still 500: exact PHP/DB error from log captured
+
+### Write results to:
+results/2026-05-04-fm-vhost-fix-001.txt
