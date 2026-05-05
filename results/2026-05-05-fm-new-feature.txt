@@ -1,0 +1,18 @@
+I have successfully refactored the Finance Manager to support per-account customizable budget percentages.
+
+### Changes Implemented:
+
+1.  **Database Schema Update**: 
+    *   Added `needs_pct`, `wants_pct`, and `invest_pct` columns to the `accounts` table.
+    *   Set default values to $50\%$, $30\%$, and $20\%$ respectively to maintain backward compatibility.
+
+2.  **Logic Refactoring (`finance_manager.php`)**:
+    *   **Dynamic Calculation**: The `compute_split` function now accepts specific percentages for each account. The total allocation for "Needs", "Wants", and "Investments" is now calculated by summing the weighted income of every individual account.
+    *   **Account-Specific Splits**: Added a new `update_account_split` handler that allows updating the percentages for a specific account.
+    *   **Validation**: Implemented a server-side check to ensure that any updated percentages sum exactly to $100\%$.
+
+3.  **UI Enhancements**:
+    *   **Inline Editing**: Added a "Split (N/W/I %)" column to the Accounts table with small input fields and a "Save" button for immediate updates.
+    *   **Updated Overview**: Changed the labels in the Overview section from fixed percentages (e.g., "Needs 50%") to "Needs Allocated", reflecting the dynamic sum of all account splits.
+
+The application is now fully dynamic, allowing different strategies for different accounts (e.g., Revolut at 50/30/20 and Cash at 65/35/0).
