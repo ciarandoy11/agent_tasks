@@ -1,0 +1,2 @@
+Fatal error: Uncaught PDOException: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'finanace_manager.recurrences' doesn't exist in /mnt/ext_ssd/finance_manager/finance_manager.php:227 Stack trace: #0 /mnt/ext_ssd/finance_manager/finance_manager.php(227): PDO->prepare() #1 {main} thrown in /mnt/ext_ssd/finance_manager/finance_manager.php on line 227
+please fix the above error.
