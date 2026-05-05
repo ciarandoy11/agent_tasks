@@ -1,0 +1,2 @@
+Fatal error: Uncaught Error: Call to undefined function account_name_by_id() in /mnt/ext_ssd/finance_manager/finance_manager.php:474 Stack trace: #0 {main} thrown in /mnt/ext_ssd/finance_manager/finance_manager.php on line 474
+please fix the above error
