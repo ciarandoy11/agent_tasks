@@ -1,0 +1,22 @@
+# FM Pi 403 Diagnostic & Fix
+# Context: Ciaran moved the directory to /mnt/ext_ssd/ and is now getting a 403 on localhost.
+
+# 1. Check Apache config for DocumentRoot change
+grep -r "DocumentRoot" /etc/httpd/conf*
+
+# 2. Check permissions on the new path
+ls -ld /mnt/ext_ssd/
+
+# 3. Check SELinux status for the mount point
+ls -lZ /mnt/ext_ssd/
+
+# 4. Check the error log for the specific 403 reason
+tail -n 20 /var/log/httpd/error_log
+
+# 5. Fix attempt: Ensure permissions and SELinux are correct for the broader path
+sudo chown -R apache:apache /mnt/ext_ssd/
+sudo chmod 755 /mnt/ext_ssd/
+sudo chcon -R -t httpd_sys_content_t /mnt/ext_ssd/
+
+# 6. Verify with curl
+curl -I http://localhost/
