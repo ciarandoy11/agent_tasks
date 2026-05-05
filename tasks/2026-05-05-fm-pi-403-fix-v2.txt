@@ -1,0 +1,13 @@
+# Target: Pi (Fedora)
+# Task: Correct ownership for 403 fix after user change to 'ciaran'
+# Path: /mnt/ext_ssd/
+
+sudo chown -R ciaran:ciaran /mnt/ext_ssd/
+sudo chmod -R 755 /mnt/ext_ssd/
+sudo restorecon -Rv /mnt/ext_ssd/
+sudo systemctl restart httpd
+
+# Verify
+ls -ld /mnt/ext_ssd/
+ps aux | grep httpd
+curl -I http://localhost/
