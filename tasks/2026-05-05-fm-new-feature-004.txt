@@ -1,0 +1,3 @@
+add a section to the finance manager app that shows the amount in each split for each account. 
+make edits in /mnt/ext_ssd/finance_manager/finance_manager.php
+Make the edits usins commands not agent_manager.sh
