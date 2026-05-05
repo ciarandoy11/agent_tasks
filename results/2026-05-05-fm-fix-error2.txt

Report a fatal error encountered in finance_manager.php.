@@ -1,0 +1,25 @@
+The error `Fatal error: Uncaught Error: Call to undefined function account_name_by_id()` was caused by a missing helper function in `/mnt/ext_ssd/finance_manager/finance_manager.php`. 
+
+### Actions Taken:
+1.  **Investigation:** Performed a recursive search across the `/mnt/ext_ssd/finance_manager/` directory for the function definition. The search returned no results, confirming the function was missing from the codebase.
+2.  **Code Analysis:** Inspected the calling site (line 474) and determined that the function is expected to take an array of accounts and an account ID, returning the corresponding account name.
+3.  **Implementation:** Created and injected a robust implementation of `account_name_by_id()` into the helper section of `finance_manager.php`.
+
+**Implemented Function:**
+```php
+function account_name_by_id(array $accounts, int $id): string
+{
+    foreach ($accounts as $account) {
+        if (isset($account['id']) && (int)$account['id'] === $id) {
+            return (string)($account['name'] ?? 'Unknown Account');
+        }
+    }
+    return 'Unknown Account';
+}
+```
+
+### Verification:
+- Verified that the function was successfully inserted into the source file.
+- The application should now correctly map account IDs to names in the income/expense tables without throwing a fatal error.
+
+**Status:** Fixed.
