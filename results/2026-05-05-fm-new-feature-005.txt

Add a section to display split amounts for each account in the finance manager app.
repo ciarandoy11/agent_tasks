@@ -1,0 +1,105 @@
+**Analysis:**
+I now have the full source code of `finance_manager.php`. I can see that the application already has a `compute_split` function and a loop that calculates total splits. To fulfill the user's request to "show the amount in each split for each account," I need to:
+1.  **Modify the PHP Logic:** Update the existing loop that calculates global totals to also populate a new `$accountSplits` array. This array will store the split results (Needs, Wants, Investment) and the total income for every individual account.
+2.  **Add a New UI Section:** Insert a new HTML "card" section into the page. This section will iterate through the accounts and display a table showing the account name, the calculated split amounts in Euros, and the total income for that account.
+
+Since the user explicitly forbade `agent_manager.sh`, I cannot delegate this semantic edit to the general agent. Instead, I will provide a precise Python script for the Worker to execute. Python is the most reliable tool for this task because it allows for safe string replacement and precise insertion points, avoiding the risk of syntax errors that often accompany `sed` or `echo` when dealing with multi-line PHP/HTML code.
+
+**MISSION BRIEF:**
+
+**Target Tool Selection:** `execute_pi_command`
+
+**Worker System Prompt:**
+"Implement the 'Account Split Details' section in the finance manager app. Since the use of `agent_manager.sh` is forbidden, you will use a Python script to perform a precise semantic edit of `/mnt/ext_ssd/finance_manager/finance_manager.php`. 
+
+The script must:
+1.  **Update the PHP Logic:** Locate the specific block of code that calculates global splits and modify it to also populate a new `$accountSplits` array with the results of `compute_split` and the account's total income for every account.
+2.  **Insert the HTML:** Locate the 'Remaining Investment' text in the HTML and find the subsequent closing `</section>` tag. Immediately after this tag, insert a new HTML `<section class="card">` containing a table that displays the account name, the three split amounts, and the total income for each account.
+3.  **Safety:** The script must verify the existence of the target blocks before replacing them to avoid corrupting the file. Ensure the final content is written back to `/mnt/ext_ssd/finance_manager/finance_manager.php` only if all modifications are successfully generated."
+
+**Data Payload:**
+```bash
+cat << 'EOF' > /tmp/modify_finance_manager.py
+import os
+
+file_path = '/mnt/ext_ssd/finance_manager/finance_manager.php'
+with open(file_path, 'r') as f:
+    content = f.read()
+
+# 1. Update PHP logic to store per-account splits
+old_php_block = """$split = ['Needs' => 0.0, 'Wants' => 0.0, 'Investment' => 0.0];
+foreach ($data['accounts'] as $account) {
+    $accId = $account['id'];
+    $accIncome = 0.0; 
+    foreach ($data['incomes'] as $i) { if (($i['account_id'] ?? 0) === $accId) $accIncome += $i['amount']; }
+    
+    $s = compute_split($accIncome, (float)$account['needs_pct'], (float)$account['wants_pct'], (float)$account['invest_pct']);
+    $split['Needs'] += $s['Needs'];
+    $split['Wants'] += $s['Wants'];
+    $split['Investment'] += $s['Investment'];
+}"""
+
+new_php_block = """$split = ['Needs' => 0.0, 'Wants' => 0.0, 'Investment' => 0.0];
+$accountSplits = [];
+foreach ($data['accounts'] as $account) {
+    $accId = $account['id'];
+    $accIncome = 0.0; 
+    foreach ($data['incomes'] as $i) { if (($i['account_id'] ?? 0) === $accId) $accIncome += $i['amount']; }
+    
+    $s = compute_split($accIncome, (float)$account['needs_pct'], (float)$account['wants_pct'], (float)$account['invest_pct']);
+    $split['Needs'] += $s['Needs'];
+    $split['Wants'] += $s['Wants'];
+    $split['Investment'] += $s['Investment'];
+    $accountSplits[$accId] = ['income' => $accIncome, 'splits' => $s];
+}"""
+
+if old_php_block in content:
+    content = content.replace(old_php_block, new_php_block)
+else:
+    print("Error: Could not find the PHP logic block to replace. File content might have changed.")
+    exit(1)
+
+# 2. Insert the HTML section
+marker = 'Remaining Investment'
+idx = content.find(marker)
+if idx != -1:
+    end_of_section = content.find('</section>', idx)
+    if end_of_section != -1:
+        insertion_point = end_of_section + 10
+        new_section = r'''
+    <section class="card">
+        <h2>Account Split Details</h2>
+        <table>
+            <thead><tr><th>Account</th><th>Needs (€)</th><th>Wants (€)</th><th>Investment (€)</th><th>Total Income (€)</th></tr></thead>
+            <tbody>
+                <?php foreach ($data['accounts'] as $account): 
+                    $info = $accountSplits[$account['id']] ?? ['income' => 0, 'splits' => ['Needs'=>0,'Wants'=>0,'Investment'=>0]];
+                    $s = $info['splits'];
+                ?>
+                <tr>
+                    <td><?= htmlspecialchars($account['name']) ?></td>
+                    <td>€ <?= number_format($s['Needs'], 2) ?></td>
+                    <td>€ <?= number_format($s['Wants'], 2) ?></td>
+                    <td>€ <?= number_format($s['Investment'], 2) ?></td>
+                    <td>€ <?= number_format($info['income'], 2) ?></td>
+                </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+    </section>
+'''
+        content = content[:insertion_point] + new_section + content[insertion_point:]
+    else:
+        print("Error: Could not find the end of the Overview section.")
+        exit(1)
+else:
+    print("Error: Could not find the 'Remaining Investment' marker.")
+    exit(1)
+
+with open(file_path, 'w') as f:
+    f.write(content)
+
+print("Successfully updated finance_manager.php with Account Split Details.")
+EOF
+python3 /tmp/modify_finance_manager.py
+```
