@@ -1,0 +1,1 @@
+create a new workflow that reads from the tldr RSS feed and creates a summary of the marketing, ai, founders and developers newsletters. and sends it to me on telegram. 
