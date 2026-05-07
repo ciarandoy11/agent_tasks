@@ -1,0 +1,58 @@
+# Target: Pi (Fedora/Ultramarine)
+# Task: Route both Tailscale dev hostnames on the same Pi IP using Apache name-based VirtualHosts
+# Context:
+# - Both hostnames resolve to the same Pi Tailscale IP
+# - Finance Manager path: /mnt/ext_ssd/
+# - My Sport Manager path: /mnt/ext_ssd/html
+# - Apache/httpd environment on Pi uses Fedora paths and logs under /var/log/httpd/
+# - Content ownership currently intended as ciaran:ciaran
+# Goal:
+# - http://financemanager-dev.tail5978.ts.net/ -> Finance Manager
+# - http://mysportmanager-dev.tail5978.ts.net/ -> My Sport Manager
+
+sudo grep -R "tail5978\|financemanager-dev\|mysportmanager-dev" /etc/httpd/conf /etc/httpd/conf.d 2>/dev/null || true
+sudo restorecon -Rv /mnt/ext_ssd/ /mnt/ext_ssd/html || true
+
+sudo tee /etc/httpd/conf.d/dev-tailnet-apps.conf > /dev/null <<'EOF'
+<VirtualHost *:80>
+    ServerName financemanager-dev.tail5978.ts.net
+    DocumentRoot /mnt/ext_ssd/
+    ErrorLog /var/log/httpd/fm-dev-error.log
+    CustomLog /var/log/httpd/fm-dev-access.log combined
+
+    <Directory /mnt/ext_ssd/>
+        AllowOverride All
+        Require all granted
+        Options Indexes FollowSymLinks
+    </Directory>
+</VirtualHost>
+
+<VirtualHost *:80>
+    ServerName mysportmanager-dev.tail5978.ts.net
+    DocumentRoot /mnt/ext_ssd/html
+    ErrorLog /var/log/httpd/msm-dev-error.log
+    CustomLog /var/log/httpd/msm-dev-access.log combined
+
+    <Directory /mnt/ext_ssd/html>
+        AllowOverride All
+        Require all granted
+        Options Indexes FollowSymLinks
+    </Directory>
+</VirtualHost>
+EOF
+
+sudo apachectl configtest
+sudo systemctl reload httpd
+
+# Verify host-based routing locally first
+curl -I -H "Host: financemanager-dev.tail5978.ts.net" http://127.0.0.1/
+curl -I -H "Host: mysportmanager-dev.tail5978.ts.net" http://127.0.0.1/
+
+# Then verify via Tailscale DNS names
+curl -I http://financemanager-dev.tail5978.ts.net/
+curl -I http://mysportmanager-dev.tail5978.ts.net/
+
+# Helpful diagnostics if either still fails
+sudo tail -n 60 /var/log/httpd/fm-dev-error.log 2>/dev/null || true
+sudo tail -n 60 /var/log/httpd/msm-dev-error.log 2>/dev/null || true
+sudo tail -n 60 /var/log/httpd/error_log 2>/dev/null || true
