@@ -1,0 +1,91 @@
+# Task: Fix Tailscale VHost Connectivity + Correct FM Path
+# Date: 2026-05-07
+# Issue: financemanager-dev.tail5978.ts.net and mysportmanager-dev.tail5978.ts.net return "cannot be reached"
+# Corrections:
+#   - FM DocumentRoot must be /mnt/ext_ssd/finance_manager (previous task used wrong path /mnt/ext_ssd/)
+#   - Firewall likely blocking port 80 on Tailscale interface (Fedora firewalld default)
+
+## Step 1: Get Tailscale IP
+tailscale ip -4
+
+## Step 2: Check what Apache is listening on
+ss -tlnp | grep httpd
+
+## Step 3: Check firewall zone for Tailscale interface
+firewall-cmd --get-active-zones
+firewall-cmd --zone=trusted --list-interfaces
+firewall-cmd --zone=public --list-services
+
+## Step 4: Add Tailscale interface to trusted zone (allows port 80)
+firewall-cmd --permanent --zone=trusted --add-interface=tailscale0
+firewall-cmd --reload
+
+## Step 5: Rewrite VHost configs with correct paths
+
+cat > /etc/httpd/conf.d/financemanager-dev.conf << 'EOF'
+<VirtualHost *:80>
+    ServerName financemanager-dev.tail5978.ts.net
+    DocumentRoot /mnt/ext_ssd/finance_manager
+    DirectoryIndex index.php index.html
+
+    <Directory /mnt/ext_ssd/finance_manager>
+        AllowOverride All
+        Require all granted
+    </Directory>
+
+    ErrorLog /var/log/httpd/financemanager-dev-error.log
+    CustomLog /var/log/httpd/financemanager-dev-access.log combined
+</VirtualHost>
+EOF
+
+cat > /etc/httpd/conf.d/mysportmanager-dev.conf << 'EOF'
+<VirtualHost *:80>
+    ServerName mysportmanager-dev.tail5978.ts.net
+    DocumentRoot /mnt/ext_ssd/html
+    DirectoryIndex index.php index.html
+
+    <Directory /mnt/ext_ssd/html>
+        AllowOverride All
+        Require all granted
+    </Directory>
+
+    ErrorLog /var/log/httpd/mysportmanager-dev-error.log
+    CustomLog /var/log/httpd/mysportmanager-dev-access.log combined
+</VirtualHost>
+EOF
+
+## Step 6: Check SELinux context on both directories
+ls -laZ /mnt/ext_ssd/finance_manager
+ls -laZ /mnt/ext_ssd/html
+
+## Step 7: Apply correct SELinux context if needed
+restorecon -Rv /mnt/ext_ssd/finance_manager
+restorecon -Rv /mnt/ext_ssd/html
+
+## Step 8: Check ownership
+ls -la /mnt/ext_ssd/finance_manager
+ls -la /mnt/ext_ssd/html
+
+## Step 9: Reload httpd
+systemctl reload httpd
+
+## Step 10: Test via localhost Host header
+TSIP=$(tailscale ip -4)
+echo "Tailscale IP: $TSIP"
+curl -s -o /dev/null -w "FM via localhost: %{http_code}
+" -H "Host: financemanager-dev.tail5978.ts.net" http://localhost/
+curl -s -o /dev/null -w "MSM via localhost: %{http_code}
+" -H "Host: mysportmanager-dev.tail5978.ts.net" http://localhost/
+
+## Step 11: Test via Tailscale IP directly
+curl -s -o /dev/null -w "FM via Tailscale IP: %{http_code}
+" -H "Host: financemanager-dev.tail5978.ts.net" http://$TSIP/
+curl -s -o /dev/null -w "MSM via Tailscale IP: %{http_code}
+" -H "Host: mysportmanager-dev.tail5978.ts.net" http://$TSIP/
+
+## Step 12: Report results
+echo "=== FIREWALL ZONE STATUS ==="
+firewall-cmd --get-active-zones
+echo "=== HTTPD LISTEN PORTS ==="
+ss -tlnp | grep httpd
+echo "=== CURL RESULTS ABOVE ==="
