@@ -1,0 +1,17 @@
+The mission has been completed successfully. Apache has been configured with separate Virtual Hosts for Finance Manager and My Sport Manager on ports 8080 and 8081 respectively, and Tailscale `serve` has been configured to provide secure HTTPS access to both.
+
+**Execution Summary:**
+1.  **Cleanup:** Removed all old conflicting VHost configurations.
+2.  **Apache Config:** Added `Listen 8080` and `Listen 8081` to `httpd.conf`.
+3.  **VHost Deployment:** 
+    *   **Finance Manager:** Created `/etc/httpd/conf.d/fm-dev-8080.conf` pointing to `/mnt/ext_ssd/finance_manager`.
+    *   **My Sport Manager:** Created `/etc/httpd/conf.d/msm-dev-8081.conf` pointing to `/mnt/ext_ssd/html`.
+4.  **Permissions:** Verified ownership of project directories as `ciaran:ciaran`.
+5.  **Network:** Opened TCP ports 8080 and 8081 in the `firewalld` trusted zone.
+6.  **Verification:** Apache restarted successfully. Local tests confirmed responses on both ports (FM: 302, MSM: 200).
+7.  **Tailscale Setup:** Configured Tailscale to proxy HTTPS traffic from the tailnet to the local ports.
+
+**Final Access URLs:**
+- **Finance Manager (Dev):** `https://raspberry-pi.tail5976d5.ts.net:8080`
+- **My Sport Manager (Dev):** `https://raspberry-pi.tail5976d5.ts.net:8081`
+- **n8n (Unchanged):** `https://raspberry-pi.tail5976d5.ts.net`
