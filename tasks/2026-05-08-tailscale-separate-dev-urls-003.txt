@@ -1,0 +1,90 @@
+# Tailscale Separate Dev URLs: FM on :8080, MSM on :8081
+# Pi: Fedora/Ultramarine, Apache (httpd), user ciaran:ciaran
+# FM path: /mnt/ext_ssd/finance_manager
+# MSM path: /mnt/ext_ssd/html
+# Tailnet hostname: raspberry-pi.tail5976d5.ts.net
+# n8n currently on https://raspberry-pi.tail5976d5.ts.net (port 443) -> DO NOT touch it
+# Goal: FM at :8080, MSM at :8081 via tailscale serve
+#
+# STEP 1: Remove any old conflicting VHost configs from previous task attempts
+rm -f /etc/httpd/conf.d/financemanager-dev.conf
+rm -f /etc/httpd/conf.d/mysportmanager-dev.conf
+rm -f /etc/httpd/conf.d/finance-manager-dev.conf
+rm -f /etc/httpd/conf.d/msm-dev.conf
+echo "Old VHost configs removed"
+
+# STEP 2: Ensure Apache listens on ports 8080 and 8081
+sed -i '/^Listen 8080$/d' /etc/httpd/conf/httpd.conf
+sed -i '/^Listen 8081$/d' /etc/httpd/conf/httpd.conf
+echo "Listen 8080" >> /etc/httpd/conf/httpd.conf
+echo "Listen 8081" >> /etc/httpd/conf/httpd.conf
+echo "Apache Listen directives updated"
+grep "^Listen" /etc/httpd/conf/httpd.conf
+
+# STEP 3: Create FM VirtualHost on port 8080
+cat > /etc/httpd/conf.d/fm-dev-8080.conf << 'EOF'
+<VirtualHost *:8080>
+    ServerName raspberry-pi.tail5976d5.ts.net
+    DocumentRoot /mnt/ext_ssd/finance_manager
+    <Directory /mnt/ext_ssd/finance_manager>
+        AllowOverride All
+        Require all granted
+    </Directory>
+    ErrorLog /var/log/httpd/fm-dev-error.log
+    CustomLog /var/log/httpd/fm-dev-access.log combined
+</VirtualHost>
+EOF
+echo "FM VHost created on port 8080"
+
+# STEP 4: Create MSM VirtualHost on port 8081
+cat > /etc/httpd/conf.d/msm-dev-8081.conf << 'EOF'
+<VirtualHost *:8081>
+    ServerName raspberry-pi.tail5976d5.ts.net
+    DocumentRoot /mnt/ext_ssd/html
+    <Directory /mnt/ext_ssd/html>
+        AllowOverride All
+        Require all granted
+    </Directory>
+    ErrorLog /var/log/httpd/msm-dev-error.log
+    CustomLog /var/log/httpd/msm-dev-access.log combined
+</VirtualHost>
+EOF
+echo "MSM VHost created on port 8081"
+
+# STEP 5: Fix ownership just in case
+chown -R ciaran:ciaran /mnt/ext_ssd/finance_manager
+chown -R ciaran:ciaran /mnt/ext_ssd/html
+echo "Ownership set to ciaran:ciaran"
+
+# STEP 6: Open ports 8080 and 8081 on firewalld for tailscale0 zone (trusted)
+firewall-cmd --zone=trusted --add-port=8080/tcp --permanent
+firewall-cmd --zone=trusted --add-port=8081/tcp --permanent
+firewall-cmd --reload
+echo "Firewall ports 8080 and 8081 opened on trusted zone"
+firewall-cmd --zone=trusted --list-ports
+
+# STEP 7: Restart Apache and check status
+systemctl restart httpd
+sleep 2
+systemctl status httpd --no-pager | head -20
+echo "Apache restart done"
+
+# STEP 8: Test local access
+echo "--- Local curl tests ---"
+curl -s -o /dev/null -w "FM localhost:8080 -> %{http_code}
+" http://localhost:8080
+curl -s -o /dev/null -w "MSM localhost:8081 -> %{http_code}
+" http://localhost:8081
+
+# STEP 9: Configure tailscale serve (HTTPS on ports 8080 and 8081)
+tailscale serve --https=8080 --bg http://localhost:8080
+tailscale serve --https=8081 --bg http://localhost:8081
+echo "Tailscale serve configured"
+sleep 2
+tailscale serve status
+
+# STEP 10: Final result
+echo "=== RESULT ==="
+echo "FM dev URL: https://raspberry-pi.tail5976d5.ts.net:8080"
+echo "MSM dev URL: https://raspberry-pi.tail5976d5.ts.net:8081"
+echo "n8n (unchanged): https://raspberry-pi.tail5976d5.ts.net"
