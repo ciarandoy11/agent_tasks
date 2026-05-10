@@ -1,0 +1,12 @@
+Diagnostic: check current state of Tailscale serve config and Apache after task 003.
+
+Run all commands and report full output verbatim.
+
+1. tailscale serve status
+2. sudo ss -tlnp | grep -E '8080|8081'
+3. sudo systemctl status httpd --no-pager -l
+4. ls -la /etc/httpd/conf.d/
+5. sudo cat /etc/httpd/conf.d/financemanager-dev.conf 2>/dev/null || echo "FILE_NOT_FOUND"
+6. sudo cat /etc/httpd/conf.d/mysportmanager-dev.conf 2>/dev/null || echo "FILE_NOT_FOUND"
+7. sudo firewall-cmd --list-ports
+8. sudo firewall-cmd --list-services
