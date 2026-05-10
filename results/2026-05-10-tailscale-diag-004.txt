@@ -1,0 +1,74 @@
+### DIAGNOSTIC REPORT: Tailscale & Apache State
+
+**1. Tailscale Serve Status**
+```text
+# Funnel on:
+#     - https://raspberry-pi.tail5976d5.ts.net
+
+https://raspberry-pi.tail5976d5.ts.net (Funnel on)
+|-- / proxy http://127.0.0.1:5678
+
+https://raspberry-pi.tail5976d5.ts.net:8080 (tailnet only)
+|-- / proxy http://localhost:8080
+
+https://raspberry-pi.tail5976d5.ts.net:8081 (tailnet only)
+|-- / proxy http://localhost:8081
+```
+
+**2. Port Listeners (8080/8081)**
+```text
+LISTEN 0      511                              *:8080             *:*    users:(("httpd",pid=162858,fd=6),("httpd",pid=162843,fd=6),("httpd",pid=162842,fd=6),("httpd",pid=153581,fd=6))
+LISTEN 0      511                              *:8081             *:*    users:(("httpd",pid=162858,fd=8),("httpd",pid=162843,fd=8),("httpd",pid=162842,fd=8),("httpd",pid=153581,fd=8))
+```
+
+**3. Apache Service Status**
+```text
+● httpd.service - The Apache HTTP Server
+     Loaded: loaded (/usr/lib/systemd/system/httpd.service; enabled; preset: disabled)
+    Drop-In: /usr/lib/systemd/system/service.d
+             └─10-timeout-abort.conf
+             /etc/systemd/system/httpd.service.d
+             └─php-fpm.conf
+     Active: active (running) since Fri 2026-05-08 12:55:04 IST; 1 day 16h ago
+...
+May 10 00:32:08 MyRouter httpd[153581]: Server configured, listening on: port 8081, port 8080, ...
+```
+
+**4. Apache Configuration Directory (`/etc/httpd/conf.d/`)**
+```text
+total 48
+drwxr-xr-x. 2 root root 4096 May  8 12:54 .
+drwxr-xr-x. 5 root root 4096 Apr 15 15:41 ..
+-rw-r--r--. 1 root root  400 Dec  9 00:00 README
+-rw-r--r--. 1 root root 2916 Dec  9 00:00 autoindex.conf
+-rw-r--r--. 1 root root  725 May  7 07:21 dev-tailnet-apps.conf
+-rw-r--r--. 1 root root  447 May  5 13:48 finance_manager.conf
+-rw-r--r--. 1 root root  345 May  8 12:54 fm-dev-8080.conf
+-rw-r--r--. 1 root root  325 May  8 12:54 msm-dev-8081.conf
+-rw-r--r--. 1 root root  272 May  5 13:47 mysportmanager.conf
+-rw-r--r--. 1 root root 1577 Apr  8 01:00 php.conf
+-rw-r--r--. 1 root root 1252 Dec  9 00:00 userdir.conf
+-rw-r--r--. 1 root root  653 Dec  9 00:00 welcome.conf.bak
+```
+
+**5. Config File: `financemanager-dev.conf`**
+```text
+FILE_NOT_FOUND
+```
+*(Note: `fm-dev-8080.conf` exists instead)*
+
+**6. Config File: `mysportmanager-dev.conf`**
+```text
+FILE_NOT_FOUND
+```
+*(Note: `msm-dev-8081.conf` exists instead)*
+
+**7. Firewall Allowed Ports**
+```text
+(No specific ports listed)
+```
+
+**8. Firewall Allowed Services**
+```text
+dhcpv6-client http mdns ssh
+```
