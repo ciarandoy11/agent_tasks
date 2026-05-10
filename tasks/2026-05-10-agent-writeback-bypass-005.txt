@@ -1,0 +1,46 @@
+RESULTS WRITE-BACK BYPASS + TAILSCALE DIAG
+
+TASK ID: 2026-05-10-agent-writeback-bypass-005
+
+Goal:
+- Bypass the broken n8n results write-back path by writing the result file to the repo from the worker itself.
+- Capture the exact state task 004 was meant to collect.
+- If repo write-back fails, print the exact git/auth/path error to stdout.
+
+Run on the Raspberry Pi host.
+Use Fedora/Ultramarine commands only.
+
+Steps:
+1. Create a temp output file, e.g. /tmp/2026-05-10-agent-writeback-bypass-005.md
+2. Append the full output of each command below, with clear section headers:
+   - date -Is
+   - hostname
+   - whoami
+   - pwd
+   - git rev-parse --show-toplevel 2>&1 || true
+   - git remote -v 2>&1 || true
+   - git status --short 2>&1 || true
+   - tailscale serve status 2>&1
+   - sudo ss -tlnp | grep -E '8080|8081' 2>&1 || echo NO_808X_LISTENERS
+   - sudo systemctl status httpd --no-pager -l 2>&1
+   - ls -la /etc/httpd/conf.d/ 2>&1
+   - sudo cat /etc/httpd/conf.d/financemanager-dev.conf 2>&1 || echo FILE_NOT_FOUND
+   - sudo cat /etc/httpd/conf.d/mysportmanager-dev.conf 2>&1 || echo FILE_NOT_FOUND
+   - sudo firewall-cmd --list-ports 2>&1
+   - sudo firewall-cmd --list-services 2>&1
+3. After collecting output, try to write it back into the GitHub repo directly from the worker:
+   - find the repo root with: git rev-parse --show-toplevel
+   - create/update: results/2026-05-10-agent-writeback-bypass-005.md
+   - git add that file
+   - git commit -m "2026-05-10-agent-writeback-bypass-005.md" || echo NO_CHANGES_TO_COMMIT
+   - git push
+4. If any git step fails, print a clear marker plus the exact error:
+   - REPO_ROOT_NOT_FOUND
+   - COMMIT_FAILED
+   - PUSH_FAILED
+5. Also print the full collected output to stdout/Telegram at the end so the diagnostic is still visible even if repo write-back fails.
+
+Success condition:
+- A file exists at results/2026-05-10-agent-writeback-bypass-005.md in ciarandoy11/agent_tasks
+- It contains the full command output above
+- stdout also includes the same output and any git failure markers if applicable
