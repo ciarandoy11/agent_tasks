@@ -1,0 +1,26 @@
+TASK: Finance Manager Prod Linode Diagnostic
+TARGET: Linode prod server via SSH from Pi
+LINODE_HOST: financemanager.ofsoftware.ie
+LINODE_USER: ciaran
+OS: Ubuntu 24.10
+
+STEPS:
+1. SSH into Linode and capture the following:
+   ssh ciaran@financemanager.ofsoftware.ie "
+     echo '=== APACHE/NGINX STATUS ===' &&
+     (systemctl status apache2 2>/dev/null || systemctl status nginx 2>/dev/null) &&
+     echo '=== LAST 50 ERROR LOG LINES ===' &&
+     (sudo tail -50 /var/log/apache2/error.log 2>/dev/null || sudo tail -50 /var/log/nginx/error.log 2>/dev/null) &&
+     echo '=== VHOST / SITE CONFIG ===' &&
+     (cat /etc/apache2/sites-enabled/*.conf 2>/dev/null || cat /etc/nginx/sites-enabled/financemanager* 2>/dev/null || ls /etc/apache2/sites-enabled/ 2>/dev/null) &&
+     echo '=== PHP/APP ERRORS ===' &&
+     (sudo tail -30 /var/log/php*.log 2>/dev/null; true) &&
+     echo '=== DISK SPACE ===' &&
+     df -h &&
+     echo '=== APP DIRECTORY ===' &&
+     (ls -la /var/www/html/ 2>/dev/null || ls -la /var/www/ 2>/dev/null)
+   "
+
+2. Write full output to results/2026-05-11-fm-prod-linode-diag-006.md
+
+GOAL: Identify root cause of HTTP 500 on financemanager.ofsoftware.ie
